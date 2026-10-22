@@ -1,0 +1,8 @@
+target/
+startup-error.log
+*.log
+.env
+.env.*
+!.env.example
+.idea/
+*.iml
