@@ -1,17 +1,18 @@
 package com.axlero.dashboard.entity;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "app_users")
+@Table(name = "users")
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, unique = true, length = 50)
     private String username;
 
     @Column(nullable = false, unique = true, length = 150)
@@ -20,21 +21,17 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false, length = 20)
-    private String role = "USER";
+    @Column(nullable = false, length = 30)
+    private String role;
 
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @OneToMany(mappedBy = "owner", fetch = FetchType.LAZY)
+    private List<Workspace> workspaces = new ArrayList<>();
 
     public User() {
     }
 
     public Long getId() {
         return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public String getUsername() {
@@ -69,7 +66,7 @@ public class User {
         this.role = role;
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
+    public List<Workspace> getWorkspaces() {
+        return workspaces;
     }
 }
