@@ -1,6 +1,6 @@
 package dto;
 
-import Role;
+import entity.Role;
 
 public class RegisterRequest {
     private String email;
