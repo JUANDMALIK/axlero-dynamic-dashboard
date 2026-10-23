@@ -58,9 +58,9 @@ async function request(endpoint, options = {}) {
 
 export const api = {
   async login(email, password) {
-    const data = await request("/api/v1/auth/authenticate", {
+    const data = await request("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username: email, password }),
     });
 
     if (!data?.token) {
@@ -72,7 +72,7 @@ export const api = {
   },
 
   async register(registrationData) {
-    const data = await request("/api/v1/auth/register", {
+    const data = await request("/api/auth/register", {
       method: "POST",
       body: JSON.stringify(registrationData),
     });

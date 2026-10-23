@@ -57,8 +57,9 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByUsername(request.username())
+                .or(() -> userRepository.findByEmail(request.username()))
                 .orElseThrow(() -> new BadCredentialsException(
-                        "Invalid username or password"));
+                        "Invalid username/email or password"));
 
         if (!passwordEncoder.matches(
                 request.password(), user.getPassword())) {

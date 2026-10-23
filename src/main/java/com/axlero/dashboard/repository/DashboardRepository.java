@@ -1,9 +1,10 @@
-
 package com.axlero.dashboard.repository;
 
 import com.axlero.dashboard.entity.Dashboard;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface DashboardRepository
-        extends JpaRepository<Dashboard, Long> {
+import java.util.Optional;
+
+public interface DashboardRepository extends JpaRepository<Dashboard, Long> {
+    Optional<Dashboard> findFirstByCreatedByOrderByIdAsc(Long createdBy);
 }
