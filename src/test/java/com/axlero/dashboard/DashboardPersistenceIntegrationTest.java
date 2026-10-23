@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
@@ -62,6 +64,27 @@ class DashboardPersistenceIntegrationTest {
 
         assertThat(savedWorkspace.getCreatedAt()).isNotNull();
         assertThat(savedWorkspace.getOwner().getId()).isEqualTo(savedUser.getId());
+    }
+
+    @Test
+    void settingWorkspacesMaintainsOwnerAndCascadePersistence() {
+        User user = new User();
+        user.setName("Katherine Johnson");
+        user.setEmail("katherine@example.com");
+        user.setPassword("encoded-password");
+
+        Workspace workspace = new Workspace();
+        workspace.setName("Flight Dynamics");
+        user.setWorkspaces(List.of(workspace));
+
+        User savedUser = userRepository.saveAndFlush(user);
+
+        assertThat(workspaceRepository.findByOwner_Id(savedUser.getId()))
+                .singleElement()
+                .satisfies(savedWorkspace -> {
+                    assertThat(savedWorkspace.getName()).isEqualTo("Flight Dynamics");
+                    assertThat(savedWorkspace.getOwner().getId()).isEqualTo(savedUser.getId());
+                });
     }
 
     @Test

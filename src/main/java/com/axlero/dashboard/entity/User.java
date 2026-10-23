@@ -50,7 +50,11 @@ public class User {
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
     public List<Workspace> getWorkspaces() { return workspaces; }
-    public void setWorkspaces(List<Workspace> workspaces) { this.workspaces = workspaces; }
+    public void setWorkspaces(List<Workspace> workspaces) {
+        List<Workspace> newWorkspaces = workspaces == null ? List.of() : new ArrayList<>(workspaces);
+        this.workspaces.clear();
+        newWorkspaces.forEach(this::addWorkspace);
+    }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
