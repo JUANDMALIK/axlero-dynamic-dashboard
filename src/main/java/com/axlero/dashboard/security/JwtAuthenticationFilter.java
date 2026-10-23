@@ -36,8 +36,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String header = request.getHeader("Authorization");
-        System.out.println("JWT DEBUG: " + request.getMethod() + " " + request.getRequestURI()
-                + " | Authorization present: " + (header != null));
 
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
@@ -62,17 +60,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     });
                 }
             } catch (JwtException | IllegalArgumentException exception) {
-                System.out.println("JWT DEBUG: validation failed: "
-                        + exception.getClass().getSimpleName()
-                        + " - " + exception.getMessage());
                 SecurityContextHolder.clearContext();
             }
         }
 
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        System.out.println("JWT DEBUG: authenticated="
-                + (auth != null && auth.isAuthenticated())
-                + " | principal=" + (auth != null ? auth.getName() : "null"));
         filterChain.doFilter(request, response);
     }
 }
