@@ -10,4 +10,8 @@ public interface WidgetConfigRepository
         extends JpaRepository<WidgetConfig, Long> {
 
     List<WidgetConfig> findByDashboardId(Long dashboardId);
+
+    List<WidgetConfig> findByDashboardIdOrderByPositionAsc(Long dashboardId);
+
+    void deleteByDashboardId(Long dashboardId);
 }

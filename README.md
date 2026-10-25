@@ -1,11 +1,12 @@
 # Dynamic Data Dashboard Builder
 
-Spring Boot application for building data dashboards. The application includes user registration and session-based login APIs.
+Spring Boot APIs and a React dashboard studio for building and arranging metric visualizations. The application includes user registration, session-based login, and owner-scoped dashboard configuration APIs.
 
 ## Requirements
 
 - Java 17+
 - Maven (or the included Maven wrapper)
+- Node.js 18+ and npm (for the React frontend)
 
 ## Run the application
 
@@ -85,6 +86,32 @@ Returns `204 No Content` and invalidates the session.
 - `401 Unauthorized`: invalid email/password on login.
 - `403 Forbidden`: missing/invalid CSRF token or unauthenticated request to a protected endpoint.
 - `409 Conflict`: email already registered.
+
+## Dashboard API
+
+Dashboard endpoints require an authenticated session. Dashboard reads are scoped to the logged-in user, and every create, update, or delete request requires the CSRF token described above.
+
+- `GET /api/dashboards` lists the current user's dashboards and widget configurations.
+- `POST /api/dashboards` creates a dashboard.
+- `GET /api/dashboards/{id}` reads one of the current user's dashboards.
+- `PUT /api/dashboards/{id}` replaces the dashboard name and its widget configurations.
+- `DELETE /api/dashboards/{id}` deletes the dashboard and its widgets.
+
+Dashboard bodies contain a `name` and a `widgets` array. A widget has `title`, `chartType` (`area`, `bar`, `line`, or `pie`), `metricType` (`sum`, `average`, or `count`), `groupByField`, `valueField`, and zero-based `position`. Updates replace the full widget list; dashboards not owned by the current user return `404 Not Found`.
+
+## React dashboard
+
+The React/Vite application lives in [`frontend/`](./frontend). Start the Spring Boot API in one terminal, then run:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open the Vite URL printed in the terminal. The development server proxies `/api` requests to `http://localhost:8080`; sign in or register using the backend session APIs. Create and arrange widgets with the dashboard builder and use **Save changes** to persist them. The chart series and summary cards are clearly labeled sample metrics because no business-data source API is configured yet.
+
+Build the frontend assets with `npm run build` from `frontend/`.
 
 ## Postman API testing
 
