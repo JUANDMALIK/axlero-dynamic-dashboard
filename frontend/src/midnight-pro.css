@@ -1,0 +1,178 @@
+﻿/* Axlero Midnight Pro — visual layer only */
+:root {
+  color-scheme: dark;
+  --mp-bg: #080d1b;
+  --mp-panel: rgba(18, 27, 49, .76);
+  --mp-panel-strong: rgba(22, 32, 57, .94);
+  --mp-border: rgba(148, 163, 255, .17);
+  --mp-text: #edf1ff;
+  --mp-muted: #9aa8c7;
+  --mp-indigo: #7865ff;
+  --mp-indigo-bright: #9a8cff;
+  --mp-green: #35d6a0;
+  --mp-shadow: 0 18px 50px rgba(0, 0, 0, .22);
+}
+
+html {
+  min-height: 100%;
+  background: var(--mp-bg);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--mp-text);
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(91, 75, 220, .19), transparent 36%),
+    radial-gradient(ellipse at 95% 25%, rgba(36, 113, 190, .12), transparent 34%),
+    var(--mp-bg);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  color: var(--mp-text);
+}
+
+/* Main surfaces and glass panels */
+#root aside,
+#root nav,
+#root header,
+#root main,
+#root section,
+#root article {
+  border-color: var(--mp-border);
+}
+
+#root aside,
+#root nav {
+  background: rgba(10, 16, 32, .94);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+#root header {
+  background: rgba(8, 13, 27, .72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* Common card surfaces, including utility-class-based React layouts */
+#root [class~="bg-white"],
+#root [class~="bg-gray-50"],
+#root [class~="bg-slate-50"],
+#root [class~="bg-white/90"],
+#root [class~="bg-white/80"],
+#root [class~="bg-white/70"] {
+  color: var(--mp-text) !important;
+  background: var(--mp-panel) !important;
+  border-color: var(--mp-border) !important;
+  box-shadow: var(--mp-shadow);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* Neutral text colors become readable on dark surfaces */
+#root [class~="text-gray-900"],
+#root [class~="text-gray-800"],
+#root [class~="text-gray-700"],
+#root [class~="text-slate-900"],
+#root [class~="text-slate-800"],
+#root [class~="text-slate-700"] {
+  color: var(--mp-text) !important;
+}
+
+#root [class~="text-gray-600"],
+#root [class~="text-gray-500"],
+#root [class~="text-slate-600"],
+#root [class~="text-slate-500"] {
+  color: var(--mp-muted) !important;
+}
+
+/* Indigo actions and active navigation */
+#root button,
+#root a {
+  transition: background-color .18s ease, border-color .18s ease,
+              color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+#root button[class~="bg-indigo-600"],
+#root button[class~="bg-violet-600"],
+#root button[class~="bg-purple-600"],
+#root a[class~="bg-indigo-600"],
+#root a[class~="bg-violet-600"] {
+  color: #fff !important;
+  background: linear-gradient(135deg, #8875ff, #5945e8) !important;
+  border: 1px solid rgba(183, 173, 255, .32);
+  box-shadow: 0 8px 24px rgba(101, 80, 255, .23);
+}
+
+#root button:hover,
+#root a:hover {
+  border-color: rgba(154, 140, 255, .5);
+}
+
+#root button[class~="bg-indigo-600"]:hover,
+#root button[class~="bg-violet-600"]:hover,
+#root button[class~="bg-purple-600"]:hover {
+  box-shadow: 0 10px 30px rgba(101, 80, 255, .34);
+  transform: translateY(-1px);
+}
+
+/* Inputs preserve their existing names, values, and event handlers */
+#root input,
+#root textarea,
+#root select {
+  color: var(--mp-text);
+  background-color: rgba(8, 14, 29, .78);
+  border-color: var(--mp-border);
+  border-radius: 12px;
+}
+
+#root input::placeholder,
+#root textarea::placeholder {
+  color: #7886a7;
+}
+
+#root input:focus,
+#root textarea:focus,
+#root select:focus {
+  outline: none;
+  border-color: var(--mp-indigo-bright);
+  box-shadow: 0 0 0 3px rgba(120, 101, 255, .16);
+}
+
+/* Tables, dividers, and subtle borders */
+#root table,
+#root th,
+#root td,
+#root hr {
+  border-color: var(--mp-border);
+}
+
+#root th {
+  color: #b9c4e2;
+}
+
+#root ::selection {
+  color: #fff;
+  background: rgba(120, 101, 255, .48);
+}
+
+/* Scrollbars */
+#root * {
+  scrollbar-color: #41466e transparent;
+  scrollbar-width: thin;
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  #root *,
+  #root *::before,
+  #root *::after {
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
