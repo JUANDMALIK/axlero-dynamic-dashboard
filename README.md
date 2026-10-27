@@ -99,6 +99,24 @@ Dashboard endpoints require an authenticated session. Dashboard reads are scoped
 
 Dashboard bodies contain a `name` and a `widgets` array. A widget has `title`, `chartType` (`area`, `bar`, `line`, or `pie`), `metricType` (`sum`, `average`, or `count`), `groupByField`, `valueField`, and zero-based `position`. Updates replace the full widget list; dashboards not owned by the current user return `404 Not Found`.
 
+### Export dashboards
+
+Download a dashboard's saved configuration as CSV or Excel (`.xlsx`):
+
+```http
+GET /api/dashboards/{id}/export?format=csv
+GET /api/dashboards/{id}/export?format=xlsx
+Cookie: JSESSIONID=<session-id>
+```
+
+The export contains a dashboard name and one row per saved widget. The current application does not connect to a business-data source, so exports contain configuration rather than calculated metric values. Only the dashboard owner can export it.
+
+### API documentation and error responses
+
+Swagger UI is available at `http://localhost:8080/swagger-ui.html`; the OpenAPI document is at `http://localhost:8080/v3/api-docs`. Documentation endpoints are public; dashboard operations still require the authenticated session cookie and CSRF tokens for mutations.
+
+API errors use a consistent JSON structure with `timestamp`, `status`, `error`, `message`, `path`, and `validationErrors`. Validation failures include field-specific messages in `validationErrors`; database constraint violations return `409 Conflict` without exposing database details.
+
 ## React dashboard
 
 The React/Vite application lives in [`frontend/`](./frontend). Start the Spring Boot API in one terminal, then run:
@@ -117,7 +135,7 @@ Build the frontend assets with `npm run build` from `frontend/`.
 
 Import [`postman/axlero-dashboard-auth.postman_collection.json`](./postman/axlero-dashboard-auth.postman_collection.json) into Postman and run the collection in order. It fetches a CSRF token, generates a unique email, registers a user, logs in, checks the current-user response, and logs out. Set the collection variable `baseUrl` if the server is not running at `http://localhost:8080`.
 
-Automated tests exercise these API responses as well as password hashing, duplicate registration, input validation, session persistence, logout, and real HTTP CSRF behavior.
+Automated tests exercise these API responses as well as password hashing, duplicate registration, input validation, session persistence, logout, real HTTP CSRF behavior, CSV/XLSX exports, ownership checks, and OpenAPI availability.
 
 ## Run tests
 

@@ -39,6 +39,11 @@ class DashboardSecurityHttpIntegrationTest {
                 restTemplate.getForEntity("/api/dashboards", String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
+        assertThat(response.getBody()).contains("\"status\":403")
+                .contains("\"error\":\"Forbidden\"")
+                .contains("\"message\":\"Access denied\"")
+                .contains("\"path\":\"/api/dashboards\"");
     }
 
     @Test

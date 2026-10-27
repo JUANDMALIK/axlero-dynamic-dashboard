@@ -1,10 +1,16 @@
 package dashboard_builder.config;
 
+import com.axlero.dashboard.api.ApiErrorResponse;
 import com.axlero.dashboard.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
@@ -18,6 +24,10 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.SecurityFilterChain;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.util.Map;
+
 @Configuration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class SecurityConfig {
@@ -25,7 +35,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            SecurityContextRepository securityContextRepository) throws Exception {
+            SecurityContextRepository securityContextRepository,
+            ObjectMapper objectMapper) throws Exception {
 
         http
             .csrf(csrf -> csrf
@@ -35,14 +46,37 @@ public class SecurityConfig {
                 .securityContextRepository(securityContextRepository))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/api/auth/csrf", "/api/auth/register", "/api/auth/login").permitAll()
                 .anyRequest().authenticated()
+            )
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint((request, response, exception) ->
+                    writeSecurityError(request, response, objectMapper, HttpStatus.FORBIDDEN))
+                .accessDeniedHandler((request, response, exception) ->
+                    writeSecurityError(request, response, objectMapper, HttpStatus.FORBIDDEN))
             )
             .headers(headers -> headers
                 .frameOptions(frame -> frame.disable())
             );
 
         return http.build();
+    }
+
+    private void writeSecurityError(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            ObjectMapper objectMapper,
+            HttpStatus status) throws IOException {
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getOutputStream(), new ApiErrorResponse(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                status == HttpStatus.UNAUTHORIZED ? "Authentication required" : "Access denied",
+                request.getRequestURI(),
+                Map.of()));
     }
 
     @Bean

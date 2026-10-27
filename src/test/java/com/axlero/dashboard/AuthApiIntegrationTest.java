@@ -66,7 +66,10 @@ class AuthApiIntegrationTest {
                         .content(json("""
                                 {"name":"Duplicate","email":"%s","password":"strong-password"}
                                 """.formatted(email.toUpperCase()))))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value("Email is already registered"))
+                .andExpect(jsonPath("$.path").value("/api/auth/register"));
     }
 
     @Test
