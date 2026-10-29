@@ -1,886 +1,359 @@
-
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Activity,
-  Bell,
-  Check,
-  ChevronDown,
-  Database,
-  LayoutDashboard,
-  LogOut,
-  LockKeyhole,
-  Mail,
-  Plus,
-  Search,
-  Settings,
-  ShoppingCart,
-  TrendingUp,
-  Users,
-  X,
-} from "lucide-react";
-import { api, logout } from "./services/api";
-import "./App.css";
+  Activity, ArrowDown, ArrowUp, BarChart3, Bell, Check, ChevronDown,
+  CircleHelp, Clock3, GripVertical, LayoutDashboard, LineChart, LogOut,
+  MoreHorizontal, Plus, Search, Settings2, Sparkles, X,
+} from 'lucide-react';
+import {
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart as RechartsLineChart,
+  Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts';
+import { dashboardApi } from './api.js';
 
-const DEFAULT_WIDGETS = [
-  { id: "default-users", title: "Total Users", type: "stat", key: "totalUsers" },
-  { id: "default-sales", title: "Total Sales", type: "stat", key: "totalSales" },
-  { id: "default-orders", title: "Total Orders", type: "stat", key: "totalOrders" },
+const metrics = {
+  revenue: { label: 'Revenue', field: 'revenue', color: '#5267e8', prefix: '$', value: '$84,254', change: '+12.8%' },
+  orders: { label: 'Orders', field: 'orders', color: '#18a978', prefix: '', value: '2,845', change: '+8.2%' },
+  customers: { label: 'Customers', field: 'customers', color: '#eab346', prefix: '', value: '1,482', change: '+4.6%' },
+  conversion: { label: 'Conversion rate', field: 'conversion', color: '#e57962', prefix: '', value: '3.62%', change: '+0.8%' },
+};
+const chartTypes = ['area', 'bar', 'line', 'pie'];
+const chartLabels = { area: 'Area', bar: 'Bar', line: 'Line', pie: 'Donut' };
+const chartColors = ['#5267e8', '#18a978', '#eab346', '#e57962', '#9871df', '#54abc4'];
+
+const initialWidgets = [
+  { title: 'Revenue over time', chartType: 'area', metricType: 'sum', groupByField: 'month', valueField: 'revenue', position: 0 },
+  { title: 'Orders by month', chartType: 'bar', metricType: 'sum', groupByField: 'month', valueField: 'orders', position: 1 },
+  { title: 'Customer growth', chartType: 'line', metricType: 'sum', groupByField: 'month', valueField: 'customers', position: 2 },
+  { title: 'Revenue mix', chartType: 'pie', metricType: 'sum', groupByField: 'category', valueField: 'revenue', position: 3 },
 ];
 
-const AVAILABLE_WIDGETS = [
-  { key: "totalUsers", title: "Total Users" },
-  { key: "totalSales", title: "Total Sales" },
-  { key: "totalOrders", title: "Total Orders" },
-];
+const periods = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const demoSeries = {
+  revenue: [38, 45, 42, 58, 54, 67, 62, 73, 68, 82, 76, 94],
+  orders: [28, 35, 31, 48, 41, 53, 50, 62, 57, 70, 66, 82],
+  customers: [22, 24, 29, 31, 38, 42, 45, 49, 55, 61, 67, 75],
+  conversion: [2.1, 2.4, 2.2, 2.7, 2.5, 2.9, 3.0, 2.8, 3.2, 3.4, 3.3, 3.6],
+};
 
-const NAV_ITEMS = [
-  { label: "Overview", icon: LayoutDashboard },
-  { label: "My Dashboards", icon: Activity },
-  { label: "Data Sources", icon: Database },
-  { label: "Settings", icon: Settings },
-];
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-
-const SAMPLE_REVENUE = [12, 18, 15, 24, 21, 30];
-
-function toApiWidget(widget) {
-  return {
-    title: widget.title,
-    type: widget.type || "stat",
-    dataKey: widget.key,
-  };
+function chartData(widget) {
+  const values = demoSeries[widget.valueField] || demoSeries.revenue;
+  if (widget.groupByField === 'category') {
+    return [
+      { name: 'Direct', value: values[9] },
+      { name: 'Organic', value: values[7] },
+      { name: 'Referral', value: values[5] },
+      { name: 'Social', value: values[3] },
+    ];
+  }
+  return periods.map((month, index) => ({ name: month, value: values[index] }));
 }
 
-function fromApiWidget(widget) {
-  return {
-    id: widget.id,
-    title: widget.title,
-    type: widget.type,
-    key: widget.dataKey,
-  };
+function IconButton({ label, onClick, children, className = '' }) {
+  return <button aria-label={label} className={`icon-button ${className}`} onClick={onClick} type="button">{children}</button>;
 }
 
-function formatNumber(value) {
-  if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "number") return value.toLocaleString("en-IN");
-  return value;
-}
+function LoginScreen({ onAuthenticated }) {
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-function formatSales(value) {
-  if (value === null || value === undefined) return "—";
-  return Number(value).toLocaleString("en-IN");
-}
-
-export default function App() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loggedIn, setLoggedIn] = useState(
-    Boolean(sessionStorage.getItem("axlero_jwt_token"))
-  );
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [dashboardData, setDashboardData] = useState(null);
-  const [widgets, setWidgets] = useState(DEFAULT_WIDGETS);
-  const [activeNav, setActiveNav] = useState("Overview");
-  const [showWidgetOptions, setShowWidgetOptions] = useState(false);
-  const [search, setSearch] = useState("");
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
-  const [notice, setNotice] = useState("");
-
-  useEffect(() => {
-    if (!loggedIn) return;
-
-    let cancelled = false;
-
-    async function initializeDashboard() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const [data, savedWidgets] = await Promise.all([
-          api.get("/dashboard"),
-          api.get("/api/dashboard/widgets"),
-        ]);
-
-        if (!Array.isArray(savedWidgets)) {
-          throw new Error("Unexpected response from the widget API.");
-        }
-
-        let finalWidgets = savedWidgets;
-
-        if (savedWidgets.length === 0) {
-          finalWidgets = await api.put(
-            "/api/dashboard/widgets",
-            DEFAULT_WIDGETS.map(toApiWidget)
-          );
-        }
-
-        if (!Array.isArray(finalWidgets)) {
-          throw new Error("The backend did not return saved widgets.");
-        }
-
-        if (cancelled) return;
-
-        setDashboardData(data);
-        setWidgets(finalWidgets.map(fromApiWidget));
-      } catch (err) {
-        if (!cancelled) {
-          setError(err.message || "Unable to load dashboard data.");
-          console.error("Dashboard initialization failed:", err);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    initializeDashboard();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loggedIn]);
-
-  async function handleLogin(event) {
+  async function submit(event) {
     event.preventDefault();
-    setError("");
-    setLoading(true);
-
+    setBusy(true);
+    setError('');
     try {
-      await api.login(email, password);
-      setLoggedIn(true);
-    } catch (err) {
-      setError(err.message || "Sign in failed. Check your email and password.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function refreshDashboard() {
-    setLoading(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const [data, savedWidgets] = await Promise.all([
-        api.get("/dashboard"),
-        api.get("/api/dashboard/widgets"),
-      ]);
-
-      if (!Array.isArray(savedWidgets)) {
-        throw new Error("Unexpected response from the widget API.");
+      const user = isRegistering
+        ? await dashboardApi.register(form)
+        : await dashboardApi.login({ email: form.email, password: form.password });
+      if (isRegistering) {
+        await dashboardApi.login({ email: form.email, password: form.password });
       }
-
-      setDashboardData(data);
-      setWidgets(savedWidgets.map(fromApiWidget));
-      setNotice("Dashboard refreshed successfully.");
-    } catch (err) {
-      setError(err.message || "Could not refresh the dashboard.");
+      onAuthenticated(user);
+    } catch (requestError) {
+      setError(requestError.message);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   }
 
-  function handleLogout() {
-    logout();
-    setLoggedIn(false);
-    setDashboardData(null);
-    setWidgets(DEFAULT_WIDGETS);
-    setPassword("");
-    setError("");
-    setNotice("");
-  }
+  return (
+    <main className="auth-page">
+      <section className="auth-card">
+        <div className="brand-mark"><BarChart3 size={21} strokeWidth={2.5} /></div>
+        <p className="eyebrow">AXLERO ANALYTICS</p>
+        <h1>{isRegistering ? 'Create your account' : 'Welcome back'}</h1>
+        <p className="auth-subtitle">Your workspace for clearer, faster decisions.</p>
+        <form onSubmit={submit}>
+          {isRegistering && <label>Your name<input autoComplete="name" onChange={(event) => setForm({ ...form, name: event.target.value })} required value={form.name} /></label>}
+          <label>Email address<input autoComplete="email" onChange={(event) => setForm({ ...form, email: event.target.value })} required type="email" value={form.email} /></label>
+          <label>Password<input autoComplete={isRegistering ? 'new-password' : 'current-password'} minLength={8} onChange={(event) => setForm({ ...form, password: event.target.value })} required type="password" value={form.password} /></label>
+          {error && <div className="form-error" role="alert">{error}</div>}
+          <button className="primary-button auth-submit" disabled={busy} type="submit">{busy ? 'Please wait…' : isRegistering ? 'Create account' : 'Sign in'}<ArrowUp size={16} /></button>
+        </form>
+        <button className="text-button auth-switch" onClick={() => { setError(''); setIsRegistering(!isRegistering); }} type="button">
+          {isRegistering ? 'Already have an account? Sign in' : 'New to Axlero? Create an account'}
+        </button>
+        <p className="auth-footnote"><Check size={14} /> Secure session protected by your workspace</p>
+      </section>
+    </main>
+  );
+}
 
-  async function saveWidgets(updatedWidgets) {
-    const saved = await api.put(
-      "/api/dashboard/widgets",
-      updatedWidgets.map(toApiWidget)
+function ChartView({ widget }) {
+  const data = chartData(widget);
+  const common = { data, margin: { top: 8, right: 8, left: -20, bottom: 0 } };
+  if (widget.chartType === 'pie') {
+    return (
+      <div className="donut-layout">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="86%" paddingAngle={4} stroke="none">
+              {data.map((entry, index) => <Cell fill={chartColors[index % chartColors.length]} key={entry.name} />)}
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="donut-legend">{data.map((entry, index) => <span key={entry.name}><i style={{ background: chartColors[index] }} />{entry.name}<b>{entry.value}%</b></span>)}</div>
+      </div>
     );
-
-    if (!Array.isArray(saved)) {
-      throw new Error("The backend did not return the saved widgets.");
-    }
-
-    setWidgets(saved.map(fromApiWidget));
   }
+  return (
+    <ResponsiveContainer height="100%" width="100%">
+      {widget.chartType === 'bar' ? (
+        <BarChart {...common}>
+          <CartesianGrid stroke="#eef0f4" strokeDasharray="3 3" vertical={false} />
+          <XAxis axisLine={false} dataKey="name" tickLine={false} tick={{ fill: '#9aa1ad', fontSize: 11 }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9aa1ad', fontSize: 11 }} />
+          <Tooltip />
+          <Bar dataKey="value" fill={metrics[widget.valueField]?.color || '#5267e8'} radius={[4, 4, 0, 0]} />
+        </BarChart>
+      ) : widget.chartType === 'line' ? (
+        <RechartsLineChart {...common}>
+          <CartesianGrid stroke="#eef0f4" strokeDasharray="3 3" vertical={false} />
+          <XAxis axisLine={false} dataKey="name" tickLine={false} tick={{ fill: '#9aa1ad', fontSize: 11 }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9aa1ad', fontSize: 11 }} />
+          <Tooltip />
+          <Line dataKey="value" dot={false} stroke={metrics[widget.valueField]?.color || '#5267e8'} strokeWidth={2.5} type="monotone" />
+        </RechartsLineChart>
+      ) : (
+        <AreaChart {...common}>
+          <defs><linearGradient id={`fill-${widget.position}`} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={metrics[widget.valueField]?.color || '#5267e8'} stopOpacity={0.22} /><stop offset="95%" stopColor={metrics[widget.valueField]?.color || '#5267e8'} stopOpacity={0.01} /></linearGradient></defs>
+          <CartesianGrid stroke="#eef0f4" strokeDasharray="3 3" vertical={false} />
+          <XAxis axisLine={false} dataKey="name" tickLine={false} tick={{ fill: '#9aa1ad', fontSize: 11 }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9aa1ad', fontSize: 11 }} />
+          <Tooltip />
+          <Area dataKey="value" fill={`url(#fill-${widget.position})`} stroke={metrics[widget.valueField]?.color || '#5267e8'} strokeWidth={2.5} type="monotone" />
+        </AreaChart>
+      )}
+    </ResponsiveContainer>
+  );
+}
 
-  async function addWidget(option) {
-    if (widgets.some((widget) => widget.key === option.key)) {
-      setNotice(`${option.title} is already on your dashboard.`);
-      setShowWidgetOptions(false);
+function Dashboard({ user, onLogout }) {
+  const [dashboards, setDashboards] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [widgets, setWidgets] = useState([]);
+  const [metric, setMetric] = useState('revenue');
+  const [chartType, setChartType] = useState('area');
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [dashboardName, setDashboardName] = useState('Executive overview');
+
+  const selectedDashboard = dashboards.find((dashboard) => dashboard.id === selectedId);
+  const totalMetric = useMemo(() => metrics.revenue, []);
+
+  const loadDashboards = useCallback(async () => {
+    const found = await dashboardApi.list();
+    if (!found.length) {
+      const created = await dashboardApi.create({ name: 'Executive overview', widgets: initialWidgets });
+      setDashboards([created]);
+      setSelectedId(created.id);
+      setDashboardName(created.name);
+      setWidgets(created.widgets);
       return;
     }
+    setDashboards(found);
+    setSelectedId(found[0].id);
+    setDashboardName(found[0].name);
+    setWidgets(found[0].widgets);
+  }, []);
 
-    const updated = [
-      ...widgets,
-      {
-        id: `new-${option.key}`,
-        title: option.title,
-        type: "stat",
-        key: option.key,
-      },
-    ];
+  useEffect(() => {
+    loadDashboards().catch((requestError) => setError(requestError.message));
+  }, [loadDashboards]);
 
-    setLoading(true);
-    setError("");
-    setNotice("");
+  function chooseDashboard(dashboard) {
+    setSelectedId(dashboard.id);
+    setDashboardName(dashboard.name);
+    setWidgets(dashboard.widgets);
+    setDirty(false);
+    setNotice('');
+  }
 
+  function updateWidget(index, changes) {
+    setWidgets((current) => current.map((widget, itemIndex) => itemIndex === index ? { ...widget, ...changes } : widget));
+    setDirty(true);
+    setNotice('');
+  }
+
+  function addWidget() {
+    const selectedMetric = metrics[metric];
+    setWidgets((current) => [...current, {
+      title: `${selectedMetric.label} by month`,
+      chartType,
+      metricType: 'sum',
+      groupByField: 'month',
+      valueField: selectedMetric.field,
+      position: current.length,
+    }]);
+    setDirty(true);
+    setNotice('');
+  }
+
+  function reorderWidgets(fromIndex, toIndex) {
+    if (fromIndex === null || fromIndex === toIndex) return;
+    setWidgets((current) => {
+      const next = [...current];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next.map((widget, index) => ({ ...widget, position: index }));
+    });
+    setDirty(true);
+  }
+
+  async function saveDashboard() {
+    if (!selectedId || saving) return;
+    setSaving(true);
+    setError('');
     try {
-      await saveWidgets(updated);
-      setShowWidgetOptions(false);
-      setNotice(`${option.title} added successfully.`);
-    } catch (err) {
-      setError(err.message || "Could not save this widget.");
+      const updated = await dashboardApi.update(selectedId, { name: dashboardName, widgets });
+      setWidgets(updated.widgets);
+      setDashboards((current) => current.map((dashboard) => dashboard.id === updated.id ? updated : dashboard));
+      setDirty(false);
+      setNotice('All changes saved');
+      window.setTimeout(() => setNotice(''), 2600);
+    } catch (requestError) {
+      setError(requestError.message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
-  async function removeWidget(id) {
-    const updated = widgets.filter((widget) => widget.id !== id);
+  async function createDashboard() {
+    const dashboard = await dashboardApi.create({ name: `Untitled dashboard ${dashboards.length + 1}`, widgets: [] });
+    setDashboards((current) => [dashboard, ...current]);
+    chooseDashboard(dashboard);
+  }
 
-    setLoading(true);
-    setError("");
-    setNotice("");
+  async function removeWidget(index) {
+    setWidgets((current) => current.filter((_, itemIndex) => index !== itemIndex).map((widget, position) => ({ ...widget, position })));
+    setDirty(true);
+  }
 
+  async function logout() {
     try {
-      await saveWidgets(updated);
-      setNotice("Widget removed successfully.");
-    } catch (err) {
-      setError(err.message || "Could not remove this widget.");
-    } finally {
-      setLoading(false);
+      await dashboardApi.logout();
+      onLogout();
+    } catch (requestError) {
+      setError(requestError.message);
     }
-  }
-
-  const filteredWidgets = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return widgets;
-
-    return widgets.filter((widget) =>
-      widget.title.toLowerCase().includes(term)
-    );
-  }, [widgets, search]);
-
-  const totalRevenue = dashboardData?.totalSales;
-  const totalUsers = dashboardData?.totalUsers;
-  const totalOrders = dashboardData?.totalOrders;
-
-  function widgetValue(widget) {
-    const value = dashboardData?.[widget.key];
-    return widget.key === "totalSales"
-      ? formatSales(value)
-      : formatNumber(value);
-  }
-
-  if (!loggedIn) {
-    return (
-      <main className="login-page">
-        <section className="login-card">
-          <div className="brand login-brand">
-            <span className="brand-logo">A</span>
-            <span>axlero</span>
-          </div>
-
-          <p className="login-eyebrow">WELCOME BACK</p>
-          <h1>Sign in to your workspace</h1>
-          <p className="muted login-description">
-            Access your dashboards, data, and insights in one place.
-          </p>
-
-          <form className="login-form" onSubmit={handleLogin}>
-            <label htmlFor="email">Email address</label>
-            <div className="input-wrap">
-              <Mail size={18} />
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-                required
-              />
-            </div>
-
-            <label htmlFor="password">Password</label>
-            <div className="input-wrap">
-              <LockKeyhole size={18} />
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Enter your password"
-                autoComplete="current-password"
-                required
-              />
-            </div>
-
-            {error && <div className="alert-error">{error}</div>}
-
-            <button className="btn btn-primary login-submit" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
-            </button>
-          </form>
-
-          <p className="login-footer">
-            Secure access powered by your Axlero backend.
-          </p>
-        </section>
-      </main>
-    );
   }
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <button
-          className="brand sidebar-brand"
-          onClick={() => setActiveNav("Overview")}
-          aria-label="Axlero overview"
-        >
-          <span className="brand-logo">A</span>
-          <span>axlero</span>
-        </button>
-
-        <p className="nav-section-label">WORKSPACE</p>
-
-        <nav className="sidebar-nav" aria-label="Main navigation">
-          {NAV_ITEMS.map(({ label, icon: Icon }) => (
-            <button
-              key={label}
-              className={`nav-item ${activeNav === label ? "active" : ""}`}
-              onClick={() => {
-                setActiveNav(label);
-                setShowWidgetOptions(false);
-                setError("");
-                setNotice("");
-              }}
-            >
-              <Icon size={19} />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
-
+        <a className="brand" href="#"><span className="brand-mark"><BarChart3 size={19} strokeWidth={2.5} /></span><span>axlero<span className="brand-dot">.</span></span></a>
+        <div className="workspace-switch"><span className="workspace-avatar">A</span><span><b>Acme Studio</b><small>Free workspace</small></span><ChevronDown size={15} /></div>
+        <div className="side-label">WORKSPACE</div>
+        <button className="nav-item active"><LayoutDashboard size={17} /> Dashboards <span className="nav-count">{dashboards.length}</span></button>
+        <button className="nav-item"><BarChart3 size={17} /> Reports</button>
+        <button className="nav-item"><Settings2 size={17} /> Data sources</button>
+        <div className="side-label side-label-spaced">YOUR DASHBOARDS <IconButton label="Create dashboard" onClick={() => createDashboard().catch((e) => setError(e.message))}><Plus size={15} /></IconButton></div>
+        <div className="dashboard-nav">{dashboards.map((dashboard) => <button className={`dashboard-link ${selectedId === dashboard.id ? 'selected' : ''}`} key={dashboard.id} onClick={() => chooseDashboard(dashboard)}><span className="dashboard-bullet" />{dashboard.name}</button>)}</div>
         <div className="sidebar-bottom">
-          <div className="avatar">N</div>
-          <div className="sidebar-user">
-            <strong>Workspace User</strong>
-            <span>Personal workspace</span>
-          </div>
-          <button
-            className="icon-button sidebar-logout"
-            onClick={handleLogout}
-            aria-label="Sign out"
-            title="Sign out"
-          >
-            <LogOut size={18} />
-          </button>
+          <div className="help-card"><div><Sparkles size={16} /><b>Need a hand?</b></div><p>Get more from your data with a little help from our team.</p><button type="button">Visit help center <ArrowUp size={13} /></button></div>
+          <button className="profile-row" onClick={logout}><span className="user-avatar">{user.name?.slice(0, 1).toUpperCase() || 'U'}</span><span><b>{user.name}</b><small>{user.email}</small></span><LogOut size={16} /></button>
         </div>
       </aside>
 
-      <main className="workspace">
+      <main className="main-content">
         <header className="topbar">
-          <div className="breadcrumbs">
-            <span>Workspace</span>
-            <span className="breadcrumb-separator">/</span>
-            <strong>{activeNav}</strong>
-          </div>
-
-          <div className="topbar-actions">
-            <label className="search-box">
-              <Search size={18} />
-              <input
-                aria-label="Search widgets"
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setActiveNav("Overview");
-                }}
-                placeholder="Search widgets..."
-              />
-              {search && (
-                <button
-                  type="button"
-                  className="search-clear"
-                  onClick={() => setSearch("")}
-                  aria-label="Clear search"
-                >
-                  <X size={15} />
-                </button>
-              )}
-            </label>
-
-            <div className="popup-anchor">
-              <button
-                className={`icon-button ${showNotifications ? "selected" : ""}`}
-                onClick={() => {
-                  setShowNotifications((value) => !value);
-                  setShowProfile(false);
-                }}
-                aria-label="Notifications"
-                title="Notifications"
-              >
-                <Bell size={19} />
-                <span className="notification-dot" />
-              </button>
-
-              {showNotifications && (
-                <div className="small-popup">
-                  <strong>Notifications</strong>
-                  <p>Your Axlero workspace is ready.</p>
-                  <p>Dashboard data is available from your backend.</p>
-                </div>
-              )}
-            </div>
-
-            <div className="popup-anchor">
-              <button
-                className="profile-button"
-                onClick={() => {
-                  setShowProfile((value) => !value);
-                  setShowNotifications(false);
-                }}
-                aria-label="Open profile menu"
-              >
-                N <ChevronDown size={14} />
-              </button>
-
-              {showProfile && (
-                <div className="small-popup profile-popup">
-                  <strong>Workspace User</strong>
-                  <p>Axlero workspace</p>
-                  <button onClick={handleLogout}>
-                    <LogOut size={16} /> Sign out
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          <div className="breadcrumbs"><span>Workspace</span><span>/</span><b>Dashboards</b></div>
+          <div className="topbar-actions"><div className="search-box"><Search size={15} /><span>Search anything...</span><kbd>⌘ K</kbd></div><IconButton label="Notifications"><Bell size={17} /><i className="notification-dot" /></IconButton><span className="top-divider" /><span className="avatar-small">{user.name?.slice(0, 1).toUpperCase() || 'U'}</span></div>
         </header>
-
-        {error && (
-          <div className="alert-error page-alert">
-            <span>{error}</span>
-            <button onClick={() => setError("")} aria-label="Dismiss error">
-              <X size={17} />
-            </button>
+        <div className="page-content">
+          <div className="page-heading">
+            <div><div className="eyebrow heading-eyebrow"><span className="live-dot" /> LIVE DASHBOARD <span className="heading-separator">·</span> UPDATED JUST NOW</div><h1>{dashboardName}</h1><p>A clear view of what’s happening across your business.</p></div>
+            <div className="heading-actions"><button className="outline-button" type="button"><Clock3 size={15} /> Last 30 days <ChevronDown size={14} /></button><button className="outline-button" type="button"><CircleHelp size={15} /> Share</button><button className="primary-button save-button" disabled={!dirty || saving} onClick={saveDashboard} type="button">{saving ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}{dirty ? <ArrowUp size={15} /> : <Check size={15} />}</button></div>
           </div>
-        )}
-
-        {notice && (
-          <div className="alert-success page-alert">
-            <Check size={17} />
-            <span>{notice}</span>
-            <button onClick={() => setNotice("")} aria-label="Dismiss message">
-              <X size={17} />
-            </button>
-          </div>
-        )}
-
-        {activeNav === "Overview" && (
-          <>
-           
-<section className="welcome-banner">
-  <div className="welcome-copy">
-    <span className="welcome-tag">YOUR WORKSPACE</span>
-    <h2>Welcome back 👋</h2>
-    <p>
-      Here's your workspace at a glance. Keep track of your
-      metrics and manage your dashboards in one place.
-    </p>
-  </div>
-  <div className="welcome-date">
-    <span> TODAY </span>
-    <strong>
-      {new Date().toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })}
-    </strong>
-  </div>
-</section>
-
-            <section className="page-heading">
-              <div>
-                <p className="eyebrow">YOUR WORKSPACE</p>
-                <h1>Dashboard Overview</h1>
-                <p className="muted">
-                  Track your metrics and build insights from your data.
-                </p>
-              </div>
-
-              <button
-                className="btn btn-primary"
-                onClick={() => setShowWidgetOptions((value) => !value)}
-                disabled={loading}
-              >
-                <Plus size={18} />
-                {showWidgetOptions ? "Close" : "Create Widget"}
-              </button>
-            </section>
-
-            <div className="connection-line">
-              <span className={`connection-indicator ${dashboardData ? "online" : ""}`} />
-              <span>
-                {dashboardData
-                  ? "Backend connected — live dashboard response"
-                  : "Connecting to your backend..."}
-              </span>
-              <button
-                className="text-button"
-                onClick={refreshDashboard}
-                disabled={loading}
-              >
-                {loading ? "Loading..." : "Refresh data"}
-              </button>
+          {error && <div className="notice error-notice" role="alert">{error}<IconButton label="Dismiss error" onClick={() => setError('')}><X size={15} /></IconButton></div>}
+          {notice && <div className="notice success-notice"><Check size={15} />{notice}</div>}
+          <section className="metric-grid" aria-label="Key metrics">
+            {Object.entries(metrics).map(([key, item], index) => (
+              <article className="metric-card" key={key}>
+                <div className="metric-card-top"><span>{item.label}</span><span className="metric-icon" style={{ color: item.color, background: `${item.color}12` }}>{index === 0 ? <Activity size={17} /> : index === 1 ? <BarChart3 size={17} /> : index === 2 ? <ArrowUp size={17} /> : <LineChart size={17} />}</span></div>
+                <strong>{item.value}</strong><div className="metric-foot"><span className="positive"><ArrowUp size={12} /> {item.change}</span><span>vs. previous period</span></div>
+              </article>
+            ))}
+          </section>
+          <section className="builder-toolbar">
+            <div className="builder-title"><span className="builder-icon"><Sparkles size={16} /></span><div><b>Build your dashboard</b><small>Choose a metric and chart, then add it to your canvas.</small></div></div>
+            <div className="builder-controls">
+              <label className="select-control"><span>Metric</span><select onChange={(event) => setMetric(event.target.value)} value={metric}>{Object.entries(metrics).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}</select></label>
+              <label className="select-control"><span>Chart type</span><select onChange={(event) => setChartType(event.target.value)} value={chartType}>{chartTypes.map((type) => <option key={type} value={type}>{chartLabels[type]}</option>)}</select></label>
+              <button className="add-widget-button" onClick={addWidget} type="button"><Plus size={16} /> Add widget</button>
             </div>
-
-            {showWidgetOptions && (
-              <section className="widget-creator panel">
-                <div className="section-heading">
-                  <div>
-                    <h2>Create a widget</h2>
-                    <p className="muted">
-                      Choose a statistic to add to your dashboard.
-                    </p>
-                  </div>
-                  <button
-                    className="icon-button"
-                    onClick={() => setShowWidgetOptions(false)}
-                    aria-label="Close widget chooser"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <div className="creator-options">
-                  {AVAILABLE_WIDGETS.map((option) => {
-                    const exists = widgets.some(
-                      (widget) => widget.key === option.key
-                    );
-
-                    return (
-                      <button
-                        key={option.key}
-                        className="creator-option"
-                        disabled={exists || loading}
-                        onClick={() => addWidget(option)}
-                      >
-                        <span className="creator-icon">
-                          {option.key === "totalUsers" && <Users size={20} />}
-                          {option.key === "totalSales" && <TrendingUp size={20} />}
-                          {option.key === "totalOrders" && <ShoppingCart size={20} />}
-                        </span>
-                        <span className="creator-text">
-                          <strong>{option.title}</strong>
-                          <small>{exists ? "Already added" : "Add to dashboard"}</small>
-                        </span>
-                        {exists ? <Check size={17} /> : <Plus size={17} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            <section className="metric-grid">
-              <article className="metric-card">
-                <div className="metric-top">
-                  <span>Total Sales</span>
-                  <span className="metric-icon purple"><TrendingUp size={19} /></span>
-                </div>
-                <strong className="metric-value">
-                  {totalRevenue == null ? "—" : `₹${formatSales(totalRevenue)}`}
-                </strong>
-                <span className="metric-caption">Reported by dashboard API</span>
-              </article>
-
-              <article className="metric-card">
-                <div className="metric-top">
-                  <span>Total Users</span>
-                  <span className="metric-icon green"><Users size={19} /></span>
-                </div>
-                <strong className="metric-value">{formatNumber(totalUsers)}</strong>
-                <span className="metric-caption">Reported by dashboard API</span>
-              </article>
-
-              <article className="metric-card">
-                <div className="metric-top">
-                  <span>Total Orders</span>
-                  <span className="metric-icon amber"><ShoppingCart size={19} /></span>
-                </div>
-                <strong className="metric-value">{formatNumber(totalOrders)}</strong>
-                <span className="metric-caption">Reported by dashboard API</span>
-              </article>
-
-              <article className="metric-card">
-                <div className="metric-top">
-                  <span>Active Widgets</span>
-                  <span className="metric-icon blue"><Activity size={19} /></span>
-                </div>
-                <strong className="metric-value">{widgets.length}</strong>
-                <span className="metric-caption">Saved in your workspace</span>
-              </article>
-            </section>
-
-            <section className="content-grid">
-              <article className="panel revenue-panel">
-                <div className="section-heading">
-                  <div>
-                    <h2>Revenue Analytics</h2>
-                    <p className="muted">Illustrative monthly trend</p>
-                  </div>
-                  <span className="sample-label">Sample chart</span>
-                </div>
-
-                <div className="chart" role="img" aria-label="Illustrative monthly revenue bar chart">
-                  <div className="chart-y-axis">
-                    <span>₹30k</span>
-                    <span>₹22.5k</span>
-                    <span>₹15k</span>
-                    <span>₹7.5k</span>
-                    <span>₹0</span>
-                  </div>
-
-                  <div className="chart-main">
-                    <div className="chart-grid-lines">
-                      {[0, 1, 2, 3, 4].map((line) => (
-                        <span key={line} />
-                      ))}
-                    </div>
-
-                    <div className="bar-list">
-                      {SAMPLE_REVENUE.map((value, index) => (
-                        <div className="bar-column" key={MONTHS[index]}>
-                          <div
-                            className="chart-bar"
-                            style={{ height: `${(value / 30) * 100}%` }}
-                            title={`${MONTHS[index]}: illustrative value`}
-                          />
-                          <span>{MONTHS[index]}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <p className="chart-disclaimer">
-                  Example visualization only. Connect a revenue-history endpoint
-                  to display real monthly figures.
-                </p>
-              </article>
-
-              <article className="panel activity-panel">
-                <div className="section-heading">
-                  <div>
-                    <h2>Workspace Activity</h2>
-                    <p className="muted">Workspace overview</p>
-                  </div>
-                  <Activity size={19} className="muted-icon" />
-                </div>
-
-                <div className="activity-list">
-                  <div className="activity-item">
-                    <span className="activity-dot violet" />
-                    <div>
-                      <strong>Dashboard opened</strong>
-                      <p>Overview workspace</p>
-                      <small>Current session</small>
-                    </div>
-                  </div>
-
-                  <div className="activity-item">
-                    <span className="activity-dot green-dot" />
-                    <div>
-                      <strong>Backend connected</strong>
-                      <p>
-                        {dashboardData
-                          ? "Dashboard API responded successfully"
-                          : "Waiting for backend data"}
-                      </p>
-                      <small>{dashboardData ? "Connected" : "Pending"}</small>
-                    </div>
-                  </div>
-
-                  <div className="activity-item">
-                    <span className="activity-dot amber-dot" />
-                    <div>
-                      <strong>Saved widgets</strong>
-                      <p>{widgets.length} widget configurations loaded</p>
-                      <small>Current workspace</small>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            </section>
-
-            <section className="panel widgets-panel">
-              <div className="section-heading">
-                <div>
-                  <h2>My Widgets</h2>
-                  <p className="muted">
-                    Your saved dashboard statistics
-                  </p>
-                </div>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setShowWidgetOptions((value) => !value)}
-                  disabled={loading}
-                >
-                  <Plus size={17} /> Add Widget
-                </button>
-              </div>
-
-              {filteredWidgets.length === 0 ? (
-                <div className="empty-state">
-                  <LayoutDashboard size={30} />
-                  <strong>{search ? "No matching widgets" : "No widgets yet"}</strong>
-                  <p>
-                    {search
-                      ? "Try a different search term."
-                      : "Create a widget to start customizing your dashboard."}
-                  </p>
-                  {!search && (
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => setShowWidgetOptions(true)}
-                    >
-                      <Plus size={17} /> Create your first widget
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="saved-widget-grid">
-                  {filteredWidgets.map((widget) => (
-                    <article className="saved-widget-card" key={widget.id}>
-                      <div className="saved-widget-top">
-                        <span>{widget.title}</span>
-                        <button
-                          className="icon-button remove-button"
-                          aria-label={`Remove ${widget.title}`}
-                          title="Remove widget"
-                          disabled={loading}
-                          onClick={() => removeWidget(widget.id)}
-                        >
-                          <X size={17} />
-                        </button>
-                      </div>
-                      <strong className="saved-widget-value">
-                        {widgetValue(widget)}
-                      </strong>
-                      <span className="saved-widget-caption">
-                        From the dashboard API
-                      </span>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
-        )}
-
-        {activeNav === "My Dashboards" && (
-          <section className="subpage">
-            <p className="eyebrow">WORKSPACE</p>
-            <h1>My Dashboards</h1>
-            <p className="muted">
-              Your current dashboard and its saved widget configurations.
-            </p>
-            <article className="panel dashboard-list-card">
-              <div className="list-icon"><LayoutDashboard size={22} /></div>
-              <div className="list-copy">
-                <strong>Overview Dashboard</strong>
-                <p>{widgets.length} saved widgets</p>
-              </div>
-              <span className="status-pill"><Check size={14} /> Available</span>
-              <button
-                className="btn btn-secondary"
-                onClick={() => setActiveNav("Overview")}
-              >
-                Open dashboard
-              </button>
-            </article>
           </section>
-        )}
-
-        {activeNav === "Data Sources" && (
-          <section className="subpage">
-            <p className="eyebrow">INTEGRATIONS</p>
-            <h1>Data Sources</h1>
-            <p className="muted">
-              Monitor the backend connection that provides dashboard statistics.
-            </p>
-            <article className="panel data-source-card">
-              <div className="list-icon"><Database size={22} /></div>
-              <div className="list-copy">
-                <strong>Axlero Spring Boot API</strong>
-                <p>Local development server · localhost:8080</p>
-                <small>Dashboard and widget endpoints</small>
-              </div>
-              <span className={`status-pill ${dashboardData ? "" : "status-pending"}`}>
-                <span className="connection-indicator online" />
-                {dashboardData ? "Connected" : "Check connection"}
-              </span>
-              <button className="btn btn-secondary" onClick={refreshDashboard} disabled={loading}>
-                {loading ? "Checking..." : "Test connection"}
-              </button>
-            </article>
-            <p className="info-note">
-              The revenue chart and activity feed currently use illustrative
-              frontend content; they are not fetched from separate backend endpoints.
-            </p>
-          </section>
-        )}
-
-        {activeNav === "Settings" && (
-          <section className="subpage">
-            <p className="eyebrow">PREFERENCES</p>
-            <h1>Settings</h1>
-            <p className="muted">Manage your current workspace session.</p>
-            <article className="panel settings-card">
-              <div className="settings-row">
-                <div className="list-icon"><LockKeyhole size={21} /></div>
-                <div className="list-copy">
-                  <strong>Authentication</strong>
-                  <p>Signed in using your backend-issued JWT session token.</p>
-                </div>
-                <span className="status-pill"><Check size={14} /> Active</span>
-              </div>
-              <div className="settings-row">
-                <div className="list-icon"><Database size={21} /></div>
-                <div className="list-copy">
-                  <strong>Widget persistence</strong>
-                  <p>Widget configurations are loaded and saved through the API.</p>
-                </div>
-                <button className="btn btn-secondary" onClick={refreshDashboard} disabled={loading}>
-                  Verify now
-                </button>
-              </div>
-              <div className="settings-row">
-                <div className="list-icon"><LogOut size={21} /></div>
-                <div className="list-copy">
-                  <strong>Sign out</strong>
-                  <p>End your current workspace session.</p>
-                </div>
-                <button className="btn btn-danger" onClick={handleLogout}>
-                  <LogOut size={16} /> Sign out
-                </button>
-              </div>
-            </article>
-          </section>
-        )}
-
-        <footer className="workspace-footer">
-          <span>© {new Date().getFullYear()} Axlero</span>
-          <span>Workspace analytics</span>
-        </footer>
+          <div className="section-title"><div><h2>Performance overview</h2><span>{widgets.length} widgets <span className="muted-dot">·</span> Drag cards to rearrange</span></div><button className="text-button" type="button"><MoreHorizontal size={18} /> Customize</button></div>
+          {widgets.length === 0 ? <div className="empty-state"><div className="empty-icon"><BarChart3 size={22} /></div><h3>Your canvas is ready</h3><p>Add a metric above to start building this dashboard.</p><button className="primary-button" onClick={addWidget} type="button"><Plus size={15} /> Add your first widget</button></div> : (
+            <section className="chart-grid">
+              {widgets.map((widget, index) => {
+                const selected = metrics[widget.valueField] || totalMetric;
+                return (
+                  <article className={`chart-card ${draggedIndex === index ? 'dragging' : ''}`} draggable onDragEnd={() => setDraggedIndex(null)} onDragOver={(event) => event.preventDefault()} onDragStart={() => setDraggedIndex(index)} onDrop={() => reorderWidgets(draggedIndex, index)} key={`${widget.id || 'new'}-${index}`}>
+                    <div className="chart-card-head">
+                      <div className="chart-title-wrap"><GripVertical className="drag-handle" size={17} /><div><h3>{widget.title}</h3><span>{widget.groupByField === 'category' ? 'By category' : 'Monthly breakdown'}</span></div></div>
+                      <div className="chart-actions"><span className="chart-menu-label">{chartLabels[widget.chartType]}</span><IconButton label={`Remove ${widget.title}`} onClick={() => removeWidget(index)}><X size={15} /></IconButton></div>
+                    </div>
+                    <div className="chart-filters">
+                      <label><span className="legend-dot" style={{ background: selected.color }} />{selected.label}<select aria-label={`Metric for ${widget.title}`} onChange={(event) => updateWidget(index, { valueField: event.target.value, title: `${metrics[event.target.value].label} by month` })} value={widget.valueField}>{Object.entries(metrics).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}</select><ChevronDown size={12} /></label>
+                      <select aria-label={`Chart type for ${widget.title}`} className="chart-type-select" onChange={(event) => updateWidget(index, { chartType: event.target.value })} value={widget.chartType}>{chartTypes.map((type) => <option key={type} value={type}>{chartLabels[type]}</option>)}</select>
+                    </div>
+                    <div className="chart-area"><ChartView widget={widget} /></div>
+                    <div className="chart-card-foot"><span><i className="demo-dot" /> Demo data · Monthly</span><span>View details <ArrowUp size={12} /></span></div>
+                  </article>
+                );
+              })}
+            </section>
+          )}
+          <div className="data-note"><Sparkles size={14} /><span>Charts use sample metrics for preview. Connect a business data source to display live values.</span><button type="button">Connect a source <ArrowUp size={12} /></button></div>
+        </div>
       </main>
     </div>
   );
+}
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [sessionError, setSessionError] = useState('');
+
+  useEffect(() => {
+    dashboardApi.currentUser()
+      .then(setUser)
+      .catch((error) => {
+        if (!error.message.includes('(403)') && !error.message.includes('(401)')) {
+          setSessionError(error.message);
+        }
+      })
+      .finally(() => setCheckingSession(false));
+  }, []);
+
+  if (checkingSession) return <div className="loading-screen"><span className="loading-mark"><BarChart3 size={20} /></span><span>Loading your workspace…</span></div>;
+  if (!user) return <><LoginScreen onAuthenticated={setUser} />{sessionError && <div className="connection-error" role="alert">Could not connect to the dashboard API: {sessionError}</div>}</>;
+  return <Dashboard key={user.id} onLogout={() => setUser(null)} user={user} />;
 }

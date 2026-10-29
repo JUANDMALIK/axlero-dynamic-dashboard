@@ -1,0 +1,207 @@
+{
+  "info": {
+    "_postman_id": "e2cda475-2279-4d32-a34c-06acbcb17f39",
+    "name": "Axlero Dynamic Dashboard - Registration and Login",
+    "description": "End-to-end registration, session login, current-user, CSRF, and logout checks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "csrfToken",
+      "value": ""
+    },
+    {
+      "key": "csrfHeader",
+      "value": "X-XSRF-TOKEN"
+    },
+    {
+      "key": "password",
+      "value": "strong-password"
+    }
+  ],
+  "item": [
+    {
+      "name": "Get CSRF token",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/auth/csrf"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('CSRF token endpoint returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('csrfToken', body.token);",
+              "pm.collectionVariables.set('csrfHeader', body.headerName);",
+              "pm.test('CSRF response includes token and header name', function () {",
+              "    pm.expect(body.token).to.be.a('string').and.not.empty;",
+              "    pm.expect(body.headerName).to.be.a('string').and.not.empty;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('email', 'postman-' + pm.variables.replaceIn('{{$randomUUID}}') + '@example.com');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Registration returns 201', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "const body = pm.response.json();",
+              "pm.test('Registration response contains public profile only', function () {",
+              "    pm.expect(body.email).to.eql(pm.collectionVariables.get('email'));",
+              "    pm.expect(body).not.to.have.property('password');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "{{csrfHeader}}",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Postman Tester\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/auth/register"
+      }
+    },
+    {
+      "name": "Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Login returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Login response contains public profile only', function () {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.email).to.eql(pm.collectionVariables.get('email'));",
+              "    pm.expect(body).not.to.have.property('password');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "{{csrfHeader}}",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "Current user",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Current user returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Current user matches logged-in account', function () {",
+              "    pm.expect(pm.response.json().email).to.eql(pm.collectionVariables.get('email'));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/auth/me"
+      }
+    },
+    {
+      "name": "Logout",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Logout returns 204', function () {",
+              "    pm.response.to.have.status(204);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "{{csrfHeader}}",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/logout"
+      }
+    }
+  ]
+}
