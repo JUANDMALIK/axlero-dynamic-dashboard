@@ -1,256 +1,144 @@
-# Axlero Dynamic Data Dashboard Builder
+# Dynamic Data Dashboard Builder
 
-A Spring Boot-based backend application for building and managing dynamic data dashboards. The application provides REST APIs for user authentication, workspace management, dashboard management, and widget configuration.
+Spring Boot APIs and a React dashboard studio for building and arranging metric visualizations. The application includes user registration, session-based login, and owner-scoped dashboard configuration APIs.
 
-## 🚀 Project Overview
+## Requirements
 
-The **Axlero Dynamic Data Dashboard Builder** aims to provide a centralized platform where users can organize workspaces, create dashboards, and configure visualization widgets.
+- Java 17+
+- Maven (or the included Maven wrapper)
+- Node.js 18+ and npm (for the React frontend)
 
-The current backend includes JWT-based authentication and REST APIs for managing workspaces, dashboards, and dashboard widgets.
+## Run the application
 
-## ✨ Features
-
-- **User Authentication:** User registration and login.
-- **JWT Security:** Token-based authentication for protected API endpoints.
-- **Workspace Management:** Create and retrieve workspaces.
-- **Dashboard Management:** Create, retrieve, update, and delete dashboards through the available API endpoints.
-- **Widget Management:** Create, retrieve, update, and delete dashboard widgets.
-- **RESTful APIs:** HTTP endpoints for interacting with backend resources.
-- **PostgreSQL Integration:** Persistent relational data storage.
-- **Validation:** Request validation for required fields and supported field lengths.
-
-## 🛠️ Technology Stack
-
-| Technology | Purpose |
-|---|---|
-| Java 21 | Programming language |
-| Spring Boot 3.5.6 | Backend framework |
-| Spring Security | Application security |
-| JWT | Token-based authentication |
-| Spring Data JPA / Hibernate | Database persistence |
-| PostgreSQL | Relational database |
-| Maven | Build and dependency management |
-| Git and GitHub | Version control and collaboration |
-| IntelliJ IDEA | Development environment |
-
-## 📋 Prerequisites
-
-Install the following before running the application:
-
-- Java Development Kit (JDK) 21
-- PostgreSQL
-- Git
-- IntelliJ IDEA or another Java IDE
-
-The project includes a Maven wrapper, so a separate Maven installation may not be necessary.
-
-## ⚙️ Installation and Setup
-
-### 1. Clone the repository
-
-```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-cd axlero-dashboard-git
-```
-
-Replace the placeholder with your actual repository URL.
-
-### 2. Configure PostgreSQL
-
-Create the application database:
-
-```sql
-CREATE DATABASE axlero_dashboard;
-```
-
-Make sure PostgreSQL is running and that your database username and password are correct.
-
-### 3. Configure environment variables
-
-The application uses environment variables for sensitive configuration values.
-
-In Windows PowerShell, set:
-
-```powershell
-$env:SPRING_DATASOURCE_PASSWORD = "YOUR_POSTGRES_PASSWORD"
-$env:JWT_SECRET = "YOUR_SECURE_JWT_SECRET"
-```
-
-Use your actual PostgreSQL password. Set a strong, private JWT secret suitable for your environment.
-
-Keep credentials out of source control. Do not commit real passwords, tokens, or production secrets.
-
-### 4. Run the application
-
-From the project root, execute:
+From the repository root:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
-The backend runs at:
+The API is available at `http://localhost:8080`. The default development database is H2, stored in `./data/dashboarddb`. The H2 console is available at `http://localhost:8080/h2-console`.
 
-```text
-http://localhost:8080
-```
+## Authentication API
 
-To compile the project:
+Authentication uses an HTTP session. A successful login sets the `JSESSIONID` cookie; send that cookie on subsequent authenticated requests. Passwords are stored using BCrypt and are never included in API responses.
 
-```powershell
-.\mvnw.cmd clean compile
-```
-
-## 🔐 Authentication Workflow
-
-1. Register a user through the registration endpoint.
-2. Log in with the registered credentials.
-3. Receive a JWT token.
-4. Include the token in requests to protected endpoints.
-
-Example authorization header:
+Because the API uses cookie-based sessions, mutating requests require a CSRF token. Fetch one first:
 
 ```http
-Authorization: Bearer <YOUR_JWT_TOKEN>
+GET /api/auth/csrf
 ```
 
-## 📡 API Endpoints
+The response contains `headerName` and `token`; the response also sets the CSRF cookie. Send the returned token using the header name in `headerName` (normally `X-XSRF-TOKEN`) on each `POST`. Keep the cookies from the CSRF and login responses. Postman automatically retains cookies for the same host.
 
-All endpoints use the base URL `http://localhost:8080`.
+### Register
 
-### Authentication
+```http
+POST /api/auth/register
+Content-Type: application/json
+X-XSRF-TOKEN: <token>
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/auth/register` | Register a user |
-| POST | `/api/auth/login` | Authenticate a user and obtain a JWT |
-
-### Workspaces
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/workspaces` | Create a workspace |
-| GET | `/api/workspaces` | Retrieve workspaces available to the authenticated user |
-
-### Dashboards
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/workspaces/{workspaceId}/dashboards` | Create a dashboard in a workspace |
-| GET | `/api/workspaces/{workspaceId}/dashboards` | List dashboards in a workspace |
-| GET | `/api/dashboards/{dashboardId}` | Retrieve a dashboard |
-| PUT | `/api/dashboards/{dashboardId}` | Update a dashboard |
-| DELETE | `/api/dashboards/{dashboardId}` | Delete a dashboard |
-
-### Dashboard Widgets
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/dashboards/{dashboardId}/widgets` | Create a widget |
-| GET | `/api/dashboards/{dashboardId}/widgets` | List widgets in a dashboard |
-| PUT | `/api/widgets/{widgetId}` | Update a widget |
-| DELETE | `/api/widgets/{widgetId}` | Delete a widget |
-
-Protected endpoints require a valid JWT in the authorization header.
-
-## 🧩 Widget Configuration
-
-A widget creation or update request accepts the following JSON fields:
-
-```json
 {
-  "title": "Monthly Sales",
-  "chartType": "BAR",
-  "metricType": "SUM",
-  "groupByField": "month",
-  "valueField": "sales",
-  "position": 0
+  "name": "Ada Lovelace",
+  "email": "ada@example.com",
+  "password": "strong-password"
 }
 ```
 
-| Field | Description |
-|---|---|
-| `title` | Widget title |
-| `chartType` | Chart type configuration |
-| `metricType` | Metric or aggregation configuration |
-| `groupByField` | Field used for grouping |
-| `valueField` | Field used for values |
-| `position` | Widget position, starting from zero |
+Returns `201 Created` with the new user's `id`, `name`, and normalized lowercase `email`. Name and email are required; password must be at least 8 characters and no more than 72 UTF-8 bytes. Email is unique regardless of case.
 
-These fields configure the widget. Actual chart rendering and data aggregation depend on the corresponding functionality being implemented.
+### Log in
 
-## 🧪 Testing the APIs
+```http
+POST /api/auth/login
+Content-Type: application/json
+X-XSRF-TOKEN: <token>
 
-You can test the backend using PowerShell, Postman, or another HTTP client.
-
-Recommended testing sequence:
-
-1. Register a user.
-2. Log in and obtain a JWT token.
-3. Create a workspace.
-4. Create a dashboard in that workspace.
-5. Create a widget in the dashboard.
-6. Retrieve the widget list.
-7. Update the widget configuration.
-8. Delete the widget and verify that it is no longer listed.
-
-The authentication, workspace, dashboard creation/listing, and widget CRUD flows have been tested during development.
-
-## 📁 Project Structure
-
-The backend follows a layered Spring Boot architecture.
-
-```text
-src/
-└── main/
-    ├── java/
-    │   └── com/axlero/dashboard/
-    │       ├── controller/
-    │       ├── dto/
-    │       ├── service/
-    │       ├── security/
-    │       └── ...
-    └── resources/
-        └── application.properties
+{
+  "email": "ada@example.com",
+  "password": "strong-password"
+}
 ```
 
-- **controller:** REST API endpoints.
-- **dto:** Request and response data transfer objects.
-- **service:** Application business logic.
-- **security:** Authentication and authorization components.
-- **resources:** Application configuration.
+Returns `200 OK` with the user profile and sets the authenticated `JSESSIONID` session cookie.
 
-The exact package contents may evolve as the project develops.
+### Get the current user
 
-## 🔒 Security Notes
+```http
+GET /api/auth/me
+Cookie: JSESSIONID=<session-id>
+```
 
-- Store database passwords and JWT secrets in environment variables.
-- Never commit real credentials or JWT tokens.
-- Use HTTPS and appropriate secret management in production.
-- Validate authentication and authorization for every protected resource.
-- Use a strong JWT secret and configure token expiration appropriately.
+Returns `200 OK` with the authenticated user's profile. Requests without a valid session are denied.
 
-## 🛣️ Future Enhancements
+### Log out
 
-Potential future improvements include:
+```http
+POST /api/auth/logout
+Cookie: JSESSIONID=<session-id>
+X-XSRF-TOKEN: <token>
+```
 
-- Dynamic chart rendering using real data.
-- CSV and other data-source integrations.
-- Dashboard visualization and filtering.
-- Frontend integration.
-- Improved error handling and API documentation.
-- Automated unit and integration tests.
-- Deployment and production configuration.
+Returns `204 No Content` and invalidates the session.
 
-These are planned enhancements and are not represented as completed features.
+### Error responses
 
-## 👨‍💻 Development
+- `400 Bad Request`: invalid JSON or validation failure.
+- `401 Unauthorized`: invalid email/password on login.
+- `403 Forbidden`: missing/invalid CSRF token or unauthenticated request to a protected endpoint.
+- `409 Conflict`: email already registered.
 
-This project is being developed as part of the Axlero internship project.
+## Dashboard API
 
-**Project:** Axlero Dynamic Data Dashboard Builder  
-**Backend:** Java and Spring Boot  
-**Database:** PostgreSQL
+Dashboard endpoints require an authenticated session. Dashboard reads are scoped to the logged-in user, and every create, update, or delete request requires the CSRF token described above.
 
-## 📄 License
+- `GET /api/dashboards` lists the current user's dashboards and widget configurations.
+- `POST /api/dashboards` creates a dashboard.
+- `GET /api/dashboards/{id}` reads one of the current user's dashboards.
+- `PUT /api/dashboards/{id}` replaces the dashboard name and its widget configurations.
+- `DELETE /api/dashboards/{id}` deletes the dashboard and its widgets.
 
-A license has not yet been specified. Add a license before distributing the project if required.
+Dashboard bodies contain a `name` and a `widgets` array. A widget has `title`, `chartType` (`area`, `bar`, `line`, or `pie`), `metricType` (`sum`, `average`, or `count`), `groupByField`, `valueField`, and zero-based `position`. Updates replace the full widget list; dashboards not owned by the current user return `404 Not Found`.
+
+### Export dashboards
+
+Download a dashboard's saved configuration as CSV or Excel (`.xlsx`):
+
+```http
+GET /api/dashboards/{id}/export?format=csv
+GET /api/dashboards/{id}/export?format=xlsx
+Cookie: JSESSIONID=<session-id>
+```
+
+The export contains a dashboard name and one row per saved widget. The current application does not connect to a business-data source, so exports contain configuration rather than calculated metric values. Only the dashboard owner can export it.
+
+### API documentation and error responses
+
+Swagger UI is available at `http://localhost:8080/swagger-ui.html`; the OpenAPI document is at `http://localhost:8080/v3/api-docs`. Documentation endpoints are public; dashboard operations still require the authenticated session cookie and CSRF tokens for mutations.
+
+API errors use a consistent JSON structure with `timestamp`, `status`, `error`, `message`, `path`, and `validationErrors`. Validation failures include field-specific messages in `validationErrors`; database constraint violations return `409 Conflict` without exposing database details.
+
+## React dashboard
+
+The React/Vite application lives in [`frontend/`](./frontend). Start the Spring Boot API in one terminal, then run:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open the Vite URL printed in the terminal. The development server proxies `/api` requests to `http://localhost:8080`; sign in or register using the backend session APIs. Create and arrange widgets with the dashboard builder and use **Save changes** to persist them. The chart series and summary cards are clearly labeled sample metrics because no business-data source API is configured yet.
+
+Build the frontend assets with `npm run build` from `frontend/`.
+
+## Postman API testing
+
+Import [`postman/axlero-dashboard-auth.postman_collection.json`](./postman/axlero-dashboard-auth.postman_collection.json) into Postman and run the collection in order. It fetches a CSRF token, generates a unique email, registers a user, logs in, checks the current-user response, and logs out. Set the collection variable `baseUrl` if the server is not running at `http://localhost:8080`.
+
+Automated tests exercise these API responses as well as password hashing, duplicate registration, input validation, session persistence, logout, real HTTP CSRF behavior, CSV/XLSX exports, ownership checks, and OpenAPI availability.
+
+## Run tests
+
+```powershell
+.\mvnw.cmd test
+```
