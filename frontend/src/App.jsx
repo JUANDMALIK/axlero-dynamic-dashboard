@@ -17,7 +17,20 @@ import {
   TrendingUp,
   Users,
   X,
-} from "lucide-react";
+
+  Moon,
+  Sun,} from "lucide-react";
+
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
 import { api, logout } from "./services/api";
 import "./App.css";
 
@@ -89,9 +102,29 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [notice, setNotice] = useState("");
+  const [datasetAnalytics, setDatasetAnalytics] = useState(null);
+  const [datasetMetadata, setDatasetMetadata] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadingDataset, setUploadingDataset] = useState(false);
+  const [draggedWidgetId, setDraggedWidgetId] = useState(null);
+
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("axlero_theme") || "light"
+  );
 
   useEffect(() => {
-    if (!loggedIn) return;
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("axlero_theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (!loggedIn) {
+      setDatasetAnalytics(null);
+      setDatasetMetadata(null);
+      return;
+    }
+
+    loadDataset();
 
     let cancelled = false;
 
@@ -143,6 +176,49 @@ export default function App() {
     };
   }, [loggedIn]);
 
+  async function loadDataset() {
+    try {
+      const analytics = await api.getDatasetAnalytics();
+      setDatasetAnalytics(analytics);
+      setDatasetMetadata(analytics);
+    } catch (err) {
+      setDatasetAnalytics(null);
+      setDatasetMetadata(null);
+      console.info("No uploaded dataset is available yet:", err.message);
+    }
+  }
+
+  async function handleDatasetUpload() {
+    if (!selectedFile) {
+      setError("Please choose a CSV file first.");
+      return;
+    }
+
+    if (!selectedFile.name.toLowerCase().endsWith(".csv")) {
+      setError("Only CSV files are supported.");
+      return;
+    }
+
+    if (selectedFile.size === 0) {
+      setError("The selected CSV file is empty.");
+      return;
+    }
+
+    setUploadingDataset(true);
+    setError("");
+    setNotice("");
+
+    try {
+      await api.uploadDataset(selectedFile);
+      await loadDataset();
+      setNotice(`${selectedFile.name} uploaded and analyzed successfully.`);
+      setSelectedFile(null);
+    } catch (err) {
+      setError(err.message || "CSV upload failed.");
+    } finally {
+      setUploadingDataset(false);
+    }
+  }
   async function handleLogin(event) {
     event.preventDefault();
     setError("");
@@ -238,6 +314,41 @@ export default function App() {
     }
   }
 
+  async function handleWidgetDrop(targetId) {
+    const sourceIndex = widgets.findIndex(
+      (widget) => widget.id === draggedWidgetId
+    );
+    const targetIndex = widgets.findIndex(
+      (widget) => widget.id === targetId
+    );
+
+    if (
+      sourceIndex < 0 ||
+      targetIndex < 0 ||
+      sourceIndex === targetIndex
+    ) {
+      setDraggedWidgetId(null);
+      return;
+    }
+
+    const updated = [...widgets];
+    const [movedWidget] = updated.splice(sourceIndex, 1);
+    updated.splice(targetIndex, 0, movedWidget);
+
+    setDraggedWidgetId(null);
+    setLoading(true);
+    setError("");
+    setNotice("");
+
+    try {
+      await saveWidgets(updated);
+      setNotice("Widget order updated successfully.");
+    } catch (err) {
+      setError(err.message || "Could not update widget order.");
+    } finally {
+      setLoading(false);
+    }
+  }
   async function removeWidget(id) {
     const updated = widgets.filter((widget) => widget.id !== id);
 
@@ -267,6 +378,13 @@ export default function App() {
   const totalRevenue = dashboardData?.totalSales;
   const totalUsers = dashboardData?.totalUsers;
   const totalOrders = dashboardData?.totalOrders;
+  const chartData = Array.isArray(datasetAnalytics?.chartData)
+    ? datasetAnalytics.chartData
+    : [];
+
+  const numericSeries = Array.isArray(datasetAnalytics?.numericColumns)
+    ? datasetAnalytics.numericColumns
+    : [];
 
   function widgetValue(widget) {
     const value = dashboardData?.[widget.key];
@@ -392,6 +510,17 @@ export default function App() {
           </div>
 
           <div className="topbar-actions">
+          <button
+            type="button"
+            className="icon-button theme-toggle"
+            onClick={() =>
+              setTheme((current) => current === "light" ? "dark" : "light")
+            }
+            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+            title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+          >
+            {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
+          </button>
             <label className="search-box">
               <Search size={18} />
               <input
@@ -488,7 +617,7 @@ export default function App() {
 <section className="welcome-banner">
   <div className="welcome-copy">
     <span className="welcome-tag">YOUR WORKSPACE</span>
-    <h2>Welcome back 👋</h2>
+    <h2>Welcome back</h2>
     <p>
       Here's your workspace at a glance. Keep track of your
       metrics and manage your dashboards in one place.
@@ -631,50 +760,62 @@ export default function App() {
 
             <section className="content-grid">
               <article className="panel revenue-panel">
-                <div className="section-heading">
-                  <div>
-                    <h2>Revenue Analytics</h2>
-                    <p className="muted">Illustrative monthly trend</p>
-                  </div>
-                  <span className="sample-label">Sample chart</span>
-                </div>
+  <div className="section-heading">
+    <div>
+      <h2>CSV Data Analytics</h2>
+      <p className="muted">
+        Visualizing numeric columns from your uploaded dataset
+      </p>
+    </div>
+    <span className="sample-label">
+      {chartData.length > 0 ? "Live dataset" : "No dataset"}
+    </span>
+  </div>
 
-                <div className="chart" role="img" aria-label="Illustrative monthly revenue bar chart">
-                  <div className="chart-y-axis">
-                    <span>₹30k</span>
-                    <span>₹22.5k</span>
-                    <span>₹15k</span>
-                    <span>₹7.5k</span>
-                    <span>₹0</span>
-                  </div>
-
-                  <div className="chart-main">
-                    <div className="chart-grid-lines">
-                      {[0, 1, 2, 3, 4].map((line) => (
-                        <span key={line} />
-                      ))}
-                    </div>
-
-                    <div className="bar-list">
-                      {SAMPLE_REVENUE.map((value, index) => (
-                        <div className="bar-column" key={MONTHS[index]}>
-                          <div
-                            className="chart-bar"
-                            style={{ height: `${(value / 30) * 100}%` }}
-                            title={`${MONTHS[index]}: illustrative value`}
-                          />
-                          <span>{MONTHS[index]}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <p className="chart-disclaimer">
-                  Example visualization only. Connect a revenue-history endpoint
-                  to display real monthly figures.
-                </p>
-              </article>
+  {chartData.length > 0 && numericSeries.length > 0 ? (
+    <>
+      <div className="dataset-chart">
+        <ResponsiveContainer width="100%" height={320}>
+          <BarChart
+            data={chartData}
+            margin={{ top: 10, right: 20, left: 5, bottom: 55 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="label"
+              angle={-25}
+              textAnchor="end"
+              interval="preserveStartEnd"
+              height={65}
+            />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            {numericSeries.map((column, index) => (
+              <Bar
+                key={column.column}
+                dataKey={column.column}
+                name={column.column}
+                fill={["#6366f1", "#0d9488", "#f59e0b", "#ec4899", "#2563eb"][index % 5]}
+                radius={[5, 5, 0, 0]}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="chart-disclaimer">
+        Showing {chartData.length.toLocaleString("en-IN")} records across{" "}
+        {numericSeries.length} numeric columns.
+      </p>
+    </>
+  ) : (
+    <div className="empty-state dataset-empty-state">
+      <Database size={30} />
+      <strong>No CSV analytics available</strong>
+      <p>Upload a CSV file in Data Sources to generate charts from your data.</p>
+    </div>
+  )}
+</article>
 
               <article className="panel activity-panel">
                 <div className="section-heading">
@@ -758,7 +899,18 @@ export default function App() {
               ) : (
                 <div className="saved-widget-grid">
                   {filteredWidgets.map((widget) => (
-                    <article className="saved-widget-card" key={widget.id}>
+                    <article
+                      className={`saved-widget-card ${draggedWidgetId === widget.id ? "is-dragging" : ""}`}
+                      key={widget.id}
+                      draggable={!loading && !search.trim()}
+                      onDragStart={() => setDraggedWidgetId(widget.id)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        handleWidgetDrop(widget.id);
+                      }}
+                      onDragEnd={() => setDraggedWidgetId(null)}
+                    >
                       <div className="saved-widget-top">
                         <span>{widget.title}</span>
                         <button
@@ -831,9 +983,61 @@ export default function App() {
                 {loading ? "Checking..." : "Test connection"}
               </button>
             </article>
+            <article className="panel dataset-upload-panel">
+              <div className="section-heading">
+                <div>
+                  <h2>Upload CSV Dataset</h2>
+                  <p className="muted">
+                    Upload your sales or business data to generate live dashboard analytics.
+                  </p>
+                </div>
+                <Database size={24} />
+              </div>
+
+              <div className="dataset-upload-controls">
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(event) =>
+                    setSelectedFile(event.target.files?.[0] || null)
+                  }
+                  disabled={uploadingDataset}
+                />
+
+                <button
+                  className="btn btn-primary"
+                  onClick={handleDatasetUpload}
+                  disabled={!selectedFile || uploadingDataset}
+                >
+                  {uploadingDataset ? "Uploading..." : "Upload and Analyze"}
+                </button>
+              </div>
+
+              {selectedFile && (
+                <p className="muted">
+                  Selected file: <strong>{selectedFile.name}</strong>
+                </p>
+              )}
+
+              {datasetMetadata && (
+                <div className="dataset-summary">
+                  <h3>Latest Uploaded Dataset</h3>
+                  <p><strong>File:</strong> {datasetMetadata.filename}</p>
+                  <p><strong>Rows:</strong> {datasetMetadata.rowCount}</p>
+                  <p><strong>Columns:</strong> {datasetMetadata.columnCount}</p>
+                  <p>
+                    <strong>Uploaded:</strong>{" "}
+                    {datasetMetadata.uploadedAt
+                      ? new Date(datasetMetadata.uploadedAt).toLocaleString()
+                      : "Available"}
+                  </p>
+                </div>
+              )}
+            </article>
+
             <p className="info-note">
-              The revenue chart and activity feed currently use illustrative
-              frontend content; they are not fetched from separate backend endpoints.
+              CSV analytics are generated from your uploaded dataset.
+              The activity feed may still contain illustrative frontend content.
             </p>
           </section>
         )}
@@ -884,3 +1088,8 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
+

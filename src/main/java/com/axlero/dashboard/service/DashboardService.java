@@ -1,13 +1,29 @@
 package com.axlero.dashboard.service;
 
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import com.axlero.dashboard.entity.Dashboard;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import com.axlero.dashboard.entity.User;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import com.axlero.dashboard.repository.DashboardRepository;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import com.axlero.dashboard.repository.UserRepository;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import java.util.LinkedHashMap;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import java.util.Map;
 
 @Service
@@ -21,6 +37,7 @@ public class DashboardService {
         this.userRepository = userRepository;
     }
 
+    @Cacheable(cacheNames = "dashboardSummary", key = "#p0")
     @Transactional(readOnly = true)
     public Map<String, Object> getDashboardSummary(String username) {
         User user = userRepository.findByUsername(username)

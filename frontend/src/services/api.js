@@ -1,4 +1,4 @@
-
+﻿
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -18,7 +18,7 @@ export function logout() {
 
 async function request(endpoint, options = {}) {
   const headers = {
-    "Content-Type": "application/json",
+    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     ...options.headers,
   };
 
@@ -84,6 +84,24 @@ export const api = {
     return data;
   },
 
+  async uploadDataset(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return request("/api/datasets/upload", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  async getDatasetAnalytics() {
+    return request("/api/datasets/latest/analytics");
+  },
+
+  async getLatestDataset() {
+    return request("/api/datasets/latest");
+  },
+
   logout,
   get: (endpoint) => request(endpoint),
 
@@ -102,3 +120,4 @@ export const api = {
   delete: (endpoint) =>
     request(endpoint, { method: "DELETE" }),
 };
+
