@@ -12,4 +12,8 @@ public interface WidgetConfigRepository
     List<WidgetConfig> findByDashboardId(Long dashboardId);
 
     List<WidgetConfig> findByDashboardIdOrderByPositionAscIdAsc(Long dashboardId);
+
+    List<WidgetConfig> findByDashboardIdOrderByPositionAsc(Long dashboardId);
+
+    void deleteByDashboardId(Long dashboardId);
 }

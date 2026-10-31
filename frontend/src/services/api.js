@@ -132,8 +132,16 @@ export const api = {
     return request("/api/dashboard");
   },
 
-  getWidgets() {
-    return request("/api/dashboard/widgets");
+  getDashboardSummary() {
+    return request("/dashboard");
+  },
+
+  async getWidgets() {
+    const widgets = await request("/api/dashboard/widgets");
+    if (!Array.isArray(widgets)) {
+      throw new ApiError("The widget API returned an unexpected response.");
+    }
+    return widgets.filter((widget) => widget.metricType !== "VALUE");
   },
 
   getDataset() {
@@ -150,6 +158,23 @@ export const api = {
       method: "POST",
       body,
     });
+  },
+
+  uploadAnalyticsDataset(file) {
+    const body = new FormData();
+    body.append("file", file);
+    return request("/api/datasets/upload", {
+      method: "POST",
+      body,
+    });
+  },
+
+  getLatestAnalyticsDataset() {
+    return request("/api/datasets/latest");
+  },
+
+  getDatasetAnalytics() {
+    return request("/api/datasets/latest/analytics");
   },
 
   deleteDataset() {

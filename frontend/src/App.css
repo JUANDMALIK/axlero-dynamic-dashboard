@@ -158,6 +158,23 @@
   font-size: 12px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid #e6e8f0;
+  border-radius: 9px;
+  color: #555d73;
+  background: white;
+}
+
 .page-heading {
   display: flex;
   align-items: center;
@@ -777,4 +794,88 @@
   .auth-card {
     padding: 25px 20px;
   }
+}
+
+.app-shell[data-theme="dark"] {
+  color: #e7edf8;
+  background: #0c1422;
+}
+
+.app-shell[data-theme="dark"] .sidebar,
+.app-shell[data-theme="dark"] .topbar {
+  border-color: #26354a;
+  background: #111c2c;
+}
+
+.app-shell[data-theme="dark"] .brand,
+.app-shell[data-theme="dark"] .profile-name strong,
+.app-shell[data-theme="dark"] .page-heading h1,
+.app-shell[data-theme="dark"] .form-heading h2,
+.app-shell[data-theme="dark"] .section-heading h2,
+.app-shell[data-theme="dark"] .widget-title h3,
+.app-shell[data-theme="dark"] .empty-state h3,
+.app-shell[data-theme="dark"] .dataset-summary strong,
+.app-shell[data-theme="dark"] .widget-fields strong {
+  color: #e7edf8;
+}
+
+.app-shell[data-theme="dark"] .sidebar-note,
+.app-shell[data-theme="dark"] .dataset-panel,
+.app-shell[data-theme="dark"] .widget-form,
+.app-shell[data-theme="dark"] .widgets-panel,
+.app-shell[data-theme="dark"] .widget-card {
+  border-color: #26354a;
+  color: #c4cee0;
+  background: #142033;
+}
+
+.app-shell[data-theme="dark"] .sidebar-note {
+  background: #1a2940;
+}
+
+.app-shell[data-theme="dark"] .avatar {
+  color: #d3cbff;
+  background: #342d63;
+}
+
+.app-shell[data-theme="dark"] .nav-item {
+  color: #d3cbff;
+  background: #29234d;
+}
+
+.app-shell[data-theme="dark"] .breadcrumbs,
+.app-shell[data-theme="dark"] .subtitle,
+.app-shell[data-theme="dark"] .form-heading p,
+.app-shell[data-theme="dark"] .section-heading p,
+.app-shell[data-theme="dark"] .dataset-summary,
+.app-shell[data-theme="dark"] .widget-title p,
+.app-shell[data-theme="dark"] .widget-fields,
+.app-shell[data-theme="dark"] .empty-state p,
+.app-shell[data-theme="dark"] .footer {
+  color: #a4b1c7;
+}
+
+.app-shell[data-theme="dark"] .dashboard-notice {
+  border-color: #403b70;
+  color: #d1cbff;
+  background: #211f3b;
+}
+
+.app-shell[data-theme="dark"] .form-grid input,
+.app-shell[data-theme="dark"] .form-grid select {
+  border-color: #35445b;
+  color: #e7edf8;
+  background: #0d1726;
+}
+
+.app-shell[data-theme="dark"] .secondary-button,
+.app-shell[data-theme="dark"] .signout-button,
+.app-shell[data-theme="dark"] .theme-button {
+  border-color: #35445b;
+  color: #d3dced;
+  background: #19263a;
+}
+
+.app-shell[data-theme="dark"] .widget-fields {
+  border-color: #26354a;
 }

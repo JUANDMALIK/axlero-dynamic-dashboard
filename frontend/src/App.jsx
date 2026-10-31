@@ -11,12 +11,14 @@ import {
   LayoutDashboard,
   LineChart as LineChartIcon,
   LogOut,
+  Moon,
   PieChart as PieChartIcon,
   Plus,
   RefreshCw,
   ShieldCheck,
   Trash2,
   Upload,
+  Sun,
 } from "lucide-react";
 import {
   Bar,
@@ -294,6 +296,8 @@ function DashboardWorkspace({
   dataset,
   onSignOut,
   setDataset,
+  theme,
+  onToggleTheme,
   username,
   widgets,
   setWidgets,
@@ -491,7 +495,7 @@ function DashboardWorkspace({
   const dashboardName = dashboard?.name || "My Dashboard";
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme}>
       <aside className="sidebar">
         <div className="brand"><span className="brand-mark">A</span> axlero</div>
         <p className="nav-label">WORKSPACE</p>
@@ -509,9 +513,19 @@ function DashboardWorkspace({
       <main className="main-content">
         <header className="topbar">
           <div className="breadcrumbs">Workspace <span>/</span> Overview</div>
-          <button className="signout-button" onClick={onSignOut} type="button">
-            <LogOut size={16} /> Sign out
-          </button>
+          <div className="topbar-actions">
+            <button
+              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              className="theme-button"
+              onClick={onToggleTheme}
+              type="button"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button className="signout-button" onClick={onSignOut} type="button">
+              <LogOut size={16} /> Sign out
+            </button>
+          </div>
         </header>
 
         <section className="page-heading">
@@ -726,12 +740,19 @@ function DashboardWorkspace({
 
 export default function App() {
   const [session, setSession] = useState(() => api.getSession());
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("axlero_theme") || "light"
+  );
   const [dashboardState, setDashboardState] = useState(() => (
     session?.token ? { status: "loading" } : { status: "idle" }
   ));
   const [dataset, setDataset] = useState(null);
   const [widgets, setWidgets] = useState([]);
   const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    localStorage.setItem("axlero_theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!session?.token) return undefined;
@@ -814,8 +835,10 @@ export default function App() {
       dashboard={dashboardState.dashboard}
       dataset={dataset}
       onSignOut={signOut}
+      onToggleTheme={() => setTheme((current) => current === "dark" ? "light" : "dark")}
       setDataset={setDataset}
       setWidgets={setWidgets}
+      theme={theme}
       username={session.username}
       widgets={widgets}
     />

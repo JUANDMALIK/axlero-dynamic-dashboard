@@ -6,6 +6,7 @@ import com.axlero.dashboard.dto.RegisterRequest;
 import com.axlero.dashboard.entity.User;
 import com.axlero.dashboard.repository.UserRepository;
 import com.axlero.dashboard.security.JwtService;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,6 +31,7 @@ public class AuthService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "dashboardSummary", allEntries = true)
     public AuthResponse register(RegisterRequest request) {
         String username = request.username().trim();
         String email = request.email().trim();
@@ -62,8 +64,9 @@ public class AuthService {
         String username = request.username().trim();
 
         User user = userRepository.findByUsername(username)
+                .or(() -> userRepository.findByEmail(username))
                 .orElseThrow(() -> new BadCredentialsException(
-                        "Invalid username or password"));
+                        "Invalid username/email or password"));
 
         if (!passwordEncoder.matches(
                 request.password(), user.getPassword())) {

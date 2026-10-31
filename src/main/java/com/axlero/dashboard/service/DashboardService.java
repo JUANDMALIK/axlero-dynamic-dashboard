@@ -1,12 +1,15 @@
 
 package com.axlero.dashboard.service;
 
+import com.axlero.dashboard.dto.WidgetRequest;
+import com.axlero.dashboard.dto.WidgetResponse;
 import com.axlero.dashboard.entity.Dashboard;
 import com.axlero.dashboard.entity.User;
 import com.axlero.dashboard.entity.WidgetConfig;
 import com.axlero.dashboard.repository.DashboardRepository;
 import com.axlero.dashboard.repository.UserRepository;
 import com.axlero.dashboard.repository.WidgetConfigRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,11 +17,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.axlero.dashboard.dto.WidgetRequest;
-import com.axlero.dashboard.dto.WidgetResponse;
-
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -37,6 +39,38 @@ public class DashboardService {
         this.dashboardRepository = dashboardRepository;
         this.userRepository = userRepository;
         this.widgetConfigRepository = widgetConfigRepository;
+    }
+
+    @Cacheable(cacheNames = "dashboardSummary", key = "#p0")
+    @Transactional(readOnly = true)
+    public Map<String, Object> getDashboardSummary(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Authenticated user was not found"));
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalUsers", userRepository.count());
+        summary.put("totalSales", 0);
+        summary.put("totalOrders", 0);
+        summary.put("dashboardName", dashboardRepository
+                .findFirstByCreatedByOrderByIdAsc(user.getId())
+                .map(Dashboard::getName)
+                .orElse("My Dashboard"));
+        return summary;
+    }
+
+    @Transactional
+    public Dashboard getOrCreateDashboard(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Authenticated user was not found"));
+        return dashboardRepository.findFirstByCreatedByOrderByIdAsc(user.getId())
+                .orElseGet(() -> {
+                    Dashboard dashboard = new Dashboard();
+                    dashboard.setName("My Dashboard");
+                    dashboard.setCreatedBy(user.getId());
+                    return dashboardRepository.save(dashboard);
+                });
     }
 
     @Transactional
@@ -65,7 +99,10 @@ public class DashboardService {
     public WidgetResponse createWidget(WidgetRequest request) {
         Dashboard dashboard = getMyDashboard();
         List<WidgetConfig> existing = widgetConfigRepository
-                .findByDashboardIdOrderByPositionAscIdAsc(dashboard.getId());
+                .findByDashboardIdOrderByPositionAscIdAsc(dashboard.getId())
+                .stream()
+                .filter(widget -> !isLegacyWidget(widget))
+                .toList();
 
         WidgetConfig widget = new WidgetConfig();
         widget.setTitle(request.title().trim());
@@ -83,23 +120,30 @@ public class DashboardService {
     public void deleteWidget(Long widgetId) {
         Dashboard dashboard = getMyDashboard();
         WidgetConfig widget = widgetConfigRepository.findById(widgetId)
-                .filter(candidate -> candidate.getDashboard().getId().equals(dashboard.getId()))
+                .filter(candidate -> !isLegacyWidget(candidate)
+                        && candidate.getDashboard().getId().equals(dashboard.getId()))
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Widget not found"));
 
         widgetConfigRepository.delete(widget);
         List<WidgetConfig> remaining = widgetConfigRepository
                 .findByDashboardIdOrderByPositionAscIdAsc(dashboard.getId());
-        IntStream.range(0, remaining.size())
-                .forEach(index -> remaining.get(index).setPosition(index));
-        widgetConfigRepository.saveAll(remaining);
+        List<WidgetConfig> remainingCharts = remaining.stream()
+                .filter(candidate -> !isLegacyWidget(candidate))
+                .toList();
+        IntStream.range(0, remainingCharts.size())
+                .forEach(index -> remainingCharts.get(index).setPosition(index));
+        widgetConfigRepository.saveAll(remainingCharts);
     }
 
     @Transactional
     public List<WidgetResponse> updateWidgetOrder(List<Long> widgetIds) {
         Dashboard dashboard = getMyDashboard();
-        List<WidgetConfig> widgets = widgetConfigRepository
+        List<WidgetConfig> allWidgets = widgetConfigRepository
                 .findByDashboardIdOrderByPositionAscIdAsc(dashboard.getId());
+        List<WidgetConfig> widgets = allWidgets.stream()
+                .filter(widget -> !isLegacyWidget(widget))
+                .toList();
         Set<Long> requestedIds = new HashSet<>(widgetIds);
 
         if (requestedIds.size() != widgetIds.size()
@@ -143,5 +187,9 @@ public class DashboardService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private boolean isLegacyWidget(WidgetConfig widget) {
+        return "VALUE".equalsIgnoreCase(widget.getMetricType());
     }
 }

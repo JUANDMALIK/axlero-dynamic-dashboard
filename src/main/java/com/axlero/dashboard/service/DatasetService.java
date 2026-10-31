@@ -8,8 +8,10 @@ import com.axlero.dashboard.dto.DatasetResponse;
 import com.axlero.dashboard.dto.WidgetResponse;
 import com.axlero.dashboard.entity.Dashboard;
 import com.axlero.dashboard.entity.DashboardDataset;
+import com.axlero.dashboard.entity.Dataset;
 import com.axlero.dashboard.entity.WidgetConfig;
 import com.axlero.dashboard.repository.DashboardDatasetRepository;
+import com.axlero.dashboard.repository.DatasetRepository;
 import com.axlero.dashboard.repository.WidgetConfigRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -18,6 +20,9 @@ import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +35,9 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -45,31 +53,45 @@ public class DatasetService {
 
     private static final int MAX_COLUMNS = 100;
     private static final int MAX_ROWS = 50_000;
+    private static final int MAX_ANALYTICS_ROWS = 100_000;
     private static final TypeReference<List<List<String>>> ROWS_TYPE =
             new TypeReference<>() { };
     private static final TypeReference<List<String>> COLUMNS_TYPE =
             new TypeReference<>() { };
 
     private final DashboardService dashboardService;
-    private final DashboardDatasetRepository datasetRepository;
+    private final DashboardDatasetRepository dashboardDatasetRepository;
     private final WidgetConfigRepository widgetConfigRepository;
     private final ObjectMapper objectMapper;
+    private final DatasetRepository analyticsDatasetRepository;
+
+    @Autowired
+    public DatasetService(
+            DashboardService dashboardService,
+            DashboardDatasetRepository dashboardDatasetRepository,
+            WidgetConfigRepository widgetConfigRepository,
+            ObjectMapper objectMapper,
+            DatasetRepository analyticsDatasetRepository) {
+        this.dashboardService = dashboardService;
+        this.dashboardDatasetRepository = dashboardDatasetRepository;
+        this.widgetConfigRepository = widgetConfigRepository;
+        this.objectMapper = objectMapper;
+        this.analyticsDatasetRepository = analyticsDatasetRepository;
+    }
 
     public DatasetService(
             DashboardService dashboardService,
-            DashboardDatasetRepository datasetRepository,
+            DashboardDatasetRepository dashboardDatasetRepository,
             WidgetConfigRepository widgetConfigRepository,
             ObjectMapper objectMapper) {
-        this.dashboardService = dashboardService;
-        this.datasetRepository = datasetRepository;
-        this.widgetConfigRepository = widgetConfigRepository;
-        this.objectMapper = objectMapper;
+        this(dashboardService, dashboardDatasetRepository, widgetConfigRepository,
+                objectMapper, null);
     }
 
     @Transactional
     public DatasetResponse getDataset() {
         Dashboard dashboard = dashboardService.getMyDashboard();
-        return datasetRepository.findByDashboardId(dashboard.getId())
+        return dashboardDatasetRepository.findByDashboardId(dashboard.getId())
                 .map(this::toResponse)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "No dataset has been uploaded"));
@@ -101,7 +123,7 @@ public class DatasetService {
         }
 
         Dashboard dashboard = dashboardService.getMyDashboard();
-        DashboardDataset dataset = datasetRepository
+        DashboardDataset dataset = dashboardDatasetRepository
                 .findByDashboardId(dashboard.getId())
                 .orElseGet(DashboardDataset::new);
         dataset.setDashboard(dashboard);
@@ -111,14 +133,14 @@ public class DatasetService {
         dataset.setRowCount(parsed.rows().size());
         dataset.setUpdatedAt(LocalDateTime.now());
 
-        return toResponse(datasetRepository.save(dataset));
+        return toResponse(dashboardDatasetRepository.save(dataset));
     }
 
     @Transactional
     public void deleteDataset() {
         Dashboard dashboard = dashboardService.getMyDashboard();
-        datasetRepository.findByDashboardId(dashboard.getId())
-                .ifPresent(datasetRepository::delete);
+        dashboardDatasetRepository.findByDashboardId(dashboard.getId())
+                .ifPresent(dashboardDatasetRepository::delete);
     }
 
     @Transactional
@@ -138,6 +160,7 @@ public class DatasetService {
         return widgetConfigRepository
                 .findByDashboardIdOrderByPositionAscIdAsc(dashboard.getId())
                 .stream()
+                .filter(widget -> !"VALUE".equalsIgnoreCase(widget.getMetricType()))
                 .map(widget -> new WidgetResult(
                         WidgetResponse.from(widget),
                         aggregate(widget, columns, rows)))
@@ -327,14 +350,15 @@ public class DatasetService {
     }
 
     private DashboardDataset requireDataset(Dashboard dashboard) {
-        return datasetRepository.findByDashboardId(dashboard.getId())
+        return dashboardDatasetRepository.findByDashboardId(dashboard.getId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.CONFLICT, "Upload a dataset before requesting chart results"));
     }
 
     private WidgetConfig findWidget(Long widgetId, Long dashboardId) {
         return widgetConfigRepository.findById(widgetId)
-                .filter(widget -> widget.getDashboard().getId().equals(dashboardId))
+                .filter(widget -> !"VALUE".equalsIgnoreCase(widget.getMetricType())
+                        && widget.getDashboard().getId().equals(dashboardId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Widget not found"));
     }
 
@@ -388,5 +412,199 @@ public class DatasetService {
     }
 
     public record WidgetResult(WidgetResponse widget, List<ChartDataPoint> data) {
+    }
+
+    @CacheEvict(cacheNames = "datasetAnalytics", key = "#p0")
+    @Transactional
+    public Map<String, Object> upload(String username, String filename, byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Choose a non-empty CSV file.");
+        }
+        if (filename == null
+                || !filename.toLowerCase(Locale.ROOT).endsWith(".csv")) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Only .csv files are supported.");
+        }
+
+        String csv;
+        try {
+            csv = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString();
+        } catch (CharacterCodingException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "The CSV file must use UTF-8 encoding.");
+        }
+
+        List<List<String>> rows;
+        try {
+            rows = CsvParser.parse(csv);
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+
+        int columnCount = rows.get(0).size();
+        int dataRows = rows.size() - 1;
+        if (columnCount > MAX_COLUMNS) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "CSV files may contain at most " + MAX_COLUMNS + " columns.");
+        }
+        if (dataRows > MAX_ANALYTICS_ROWS) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "CSV files may contain at most " + MAX_ANALYTICS_ROWS + " data rows.");
+        }
+
+        Dashboard dashboard = dashboardService.getOrCreateDashboard(username);
+        Dataset dataset = new Dataset();
+        dataset.setFilename(safeFilename(filename));
+        dataset.setCsvContent(csv);
+        dataset.setRowCount(dataRows);
+        dataset.setHeadersJson(writeJson(rows.get(0)));
+        dataset.setDashboard(dashboard);
+        Dataset saved = analyticsDatasetRepository().save(dataset);
+        return analyticsMetadata(saved, rows.get(0));
+    }
+
+    @Transactional
+    public Map<String, Object> latest(String username) {
+        Dashboard dashboard = dashboardService.getOrCreateDashboard(username);
+        Dataset dataset = analyticsDatasetRepository()
+                .findFirstByDashboardIdOrderByUploadedAtDesc(dashboard.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "No CSV dataset has been uploaded yet."));
+        return analyticsMetadata(dataset, readHeaders(dataset));
+    }
+
+    @Cacheable(cacheNames = "datasetAnalytics", key = "#p0")
+    @Transactional
+    public Map<String, Object> analytics(String username) {
+        Dashboard dashboard = dashboardService.getOrCreateDashboard(username);
+        Dataset dataset = analyticsDatasetRepository()
+                .findFirstByDashboardIdOrderByUploadedAtDesc(dashboard.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Upload a CSV file before requesting analytics."));
+
+        List<List<String>> rows;
+        try {
+            rows = CsvParser.parse(dataset.getCsvContent());
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("The saved CSV data could not be parsed.", exception);
+        }
+
+        List<String> headers = rows.get(0);
+        List<Map<String, Object>> numericColumns = new ArrayList<>();
+        for (int column = 0; column < headers.size(); column++) {
+            double sum = 0;
+            double min = Double.POSITIVE_INFINITY;
+            double max = Double.NEGATIVE_INFINITY;
+            int numericCount = 0;
+
+            for (int row = 1; row < rows.size(); row++) {
+                String rawValue = rows.get(row).get(column).trim();
+                if (rawValue.isEmpty()) {
+                    continue;
+                }
+                try {
+                    double value = Double.parseDouble(rawValue);
+                    if (Double.isFinite(value)) {
+                        sum += value;
+                        min = Math.min(min, value);
+                        max = Math.max(max, value);
+                        numericCount++;
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Non-numeric cells are excluded from numeric statistics.
+                }
+            }
+
+            if (numericCount > 0) {
+                Map<String, Object> statistics = new LinkedHashMap<>();
+                statistics.put("column", headers.get(column));
+                statistics.put("numericCount", numericCount);
+                statistics.put("sum", sum);
+                statistics.put("average", sum / numericCount);
+                statistics.put("min", min);
+                statistics.put("max", max);
+                numericColumns.add(statistics);
+            }
+        }
+
+        int labelColumn = firstNonNumericColumn(headers.size(), rows);
+        List<Map<String, Object>> chartData = new ArrayList<>();
+        for (int row = 1; row < rows.size(); row++) {
+            Map<String, Object> chartRow = new LinkedHashMap<>();
+            chartRow.put("label", labelColumn >= 0
+                    ? rows.get(row).get(labelColumn)
+                    : "Row " + row);
+
+            for (int column = 0; column < headers.size(); column++) {
+                try {
+                    double value = Double.parseDouble(rows.get(row).get(column).trim());
+                    if (Double.isFinite(value)) {
+                        chartRow.put(headers.get(column), value);
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Non-numeric cells are not chart series.
+                }
+            }
+            chartData.add(chartRow);
+        }
+
+        Map<String, Object> result = analyticsMetadata(dataset, headers);
+        result.put("numericColumns", numericColumns);
+        result.put("chartData", chartData);
+        result.put("chartLabelKey", labelColumn >= 0 ? headers.get(labelColumn) : "label");
+        result.put("message", numericColumns.isEmpty()
+                ? "No numeric columns were found in this dataset."
+                : "Statistics calculated from numeric values in the uploaded CSV.");
+        return result;
+    }
+
+    private int firstNonNumericColumn(int columnCount, List<List<String>> rows) {
+        for (int column = 0; column < columnCount; column++) {
+            boolean hasNumericValue = false;
+            for (int row = 1; row < rows.size(); row++) {
+                try {
+                    double value = Double.parseDouble(rows.get(row).get(column).trim());
+                    if (Double.isFinite(value)) {
+                        hasNumericValue = true;
+                        break;
+                    }
+                } catch (NumberFormatException ignored) {
+                    // A non-numeric value can identify a chart category.
+                }
+            }
+            if (!hasNumericValue) {
+                return column;
+            }
+        }
+        return -1;
+    }
+
+    private List<String> readHeaders(Dataset dataset) {
+        return readJson(dataset.getHeadersJson(), COLUMNS_TYPE);
+    }
+
+    private Map<String, Object> analyticsMetadata(Dataset dataset, List<String> headers) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", dataset.getId());
+        result.put("filename", dataset.getFilename());
+        result.put("rowCount", dataset.getRowCount());
+        result.put("columnCount", headers.size());
+        result.put("headers", headers);
+        result.put("uploadedAt", dataset.getUploadedAt());
+        return result;
+    }
+
+    private DatasetRepository analyticsDatasetRepository() {
+        if (analyticsDatasetRepository == null) {
+            throw new IllegalStateException("CSV analytics storage is not configured.");
+        }
+        return analyticsDatasetRepository;
     }
 }

@@ -56,7 +56,7 @@ class DashboardServiceTest {
                         List.of(new SimpleGrantedAuthority("ROLE_USER"))));
 
         User user = new User();
-        user.setId(12L);
+        ReflectionTestUtils.setField(user, "id", 12L);
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
 
         dashboard = new Dashboard();
@@ -110,6 +110,27 @@ class DashboardServiceTest {
                 ResponseStatusException.class,
                 () -> dashboardService.updateWidgetOrder(List.of(1L)));
         verify(widgetConfigRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void dashboardLookupUsesTheAuthenticatedUsersExistingId() {
+        assertEquals(dashboard, dashboardService.getMyDashboard());
+        verify(dashboardRepository).findFirstByCreatedByOrderByIdAsc(12L);
+    }
+
+    @Test
+    void widgetListPreservesLegacyAndChartBuilderResponseCompatibility() {
+        WidgetConfig legacyWidget = widget(2L, 0);
+        legacyWidget.setChartType("stat");
+        legacyWidget.setMetricType("VALUE");
+        when(widgetConfigRepository.findByDashboardIdOrderByPositionAscIdAsc(34L))
+                .thenReturn(List.of(widget(1L, 0), legacyWidget));
+
+        var result = dashboardService.getMyWidgets();
+
+        assertEquals(List.of(1L, 2L), result.stream().map(item -> item.id()).toList());
+        assertEquals("stat", result.get(1).type());
+        assertEquals("id", result.get(1).dataKey());
     }
 
     private WidgetConfig widget(Long id, int position) {

@@ -12,6 +12,10 @@ export default defineConfig(({ mode }) => {
           target: env.VITE_API_PROXY_TARGET || 'http://localhost:8081',
           changeOrigin: true,
         },
+        '/dashboard': {
+          target: env.VITE_API_PROXY_TARGET || 'http://localhost:8081',
+          changeOrigin: true,
+        },
       },
     },
   }
