@@ -18,11 +18,6 @@ public class WidgetConfigController {
         this.widgetConfigService = widgetConfigService;
     }
 
-    @GetMapping
-    public List<WidgetConfigResponse> getWidgets(Authentication authentication) {
-        return widgetConfigService.list(authentication.getName());
-    }
-
     @PutMapping
     public List<WidgetConfigResponse> replaceWidgets(
             Authentication authentication,

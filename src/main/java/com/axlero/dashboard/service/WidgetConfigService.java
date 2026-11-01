@@ -6,8 +6,10 @@ import com.axlero.dashboard.entity.Dashboard;
 import com.axlero.dashboard.entity.WidgetConfig;
 import com.axlero.dashboard.repository.WidgetConfigRepository;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -26,25 +28,37 @@ public class WidgetConfigService {
     public List<WidgetConfigResponse> list(String username) {
         Dashboard dashboard = dashboardService.getOrCreateDashboard(username);
         return widgetRepository.findByDashboardIdOrderByPositionAsc(dashboard.getId())
-                .stream().map(WidgetConfigService::toResponse).toList();
+                .stream()
+                .filter(WidgetConfigService::isLegacyWidget)
+                .map(WidgetConfigService::toResponse)
+                .toList();
     }
 
     @Transactional
     public List<WidgetConfigResponse> replace(String username,
                                              List<@Valid WidgetConfigRequest> requests) {
-        Dashboard dashboard = dashboardService.getOrCreateDashboard(username);
-        widgetRepository.deleteByDashboardId(dashboard.getId());
-
         if (requests == null) {
-            return List.of();
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Widget list is required");
+        }
+        if (requests.stream().anyMatch(request ->
+                request == null || request.title() == null || request.title().isBlank())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Every widget must have a title");
+        }
+
+        Dashboard dashboard = dashboardService.getOrCreateDashboard(username);
+        List<WidgetConfig> existing =
+                widgetRepository.findByDashboardIdOrderByPositionAscIdAsc(dashboard.getId());
+        List<WidgetConfig> legacyWidgets =
+                existing.stream().filter(WidgetConfigService::isLegacyWidget).toList();
+        if (!legacyWidgets.isEmpty()) {
+            widgetRepository.deleteAll(legacyWidgets);
         }
 
         List<WidgetConfig> saved = new java.util.ArrayList<>();
         int position = 0;
         for (WidgetConfigRequest request : requests) {
-            if (request == null || request.title() == null || request.title().isBlank()) {
-                continue;
-            }
             WidgetConfig widget = new WidgetConfig();
             widget.setTitle(request.title().trim());
             widget.setChartType(blankToDefault(request.type(), "stat"));
@@ -55,6 +69,10 @@ public class WidgetConfigService {
             saved.add(widgetRepository.save(widget));
         }
         return saved.stream().map(WidgetConfigService::toResponse).toList();
+    }
+
+    private static boolean isLegacyWidget(WidgetConfig widget) {
+        return "VALUE".equalsIgnoreCase(widget.getMetricType());
     }
 
     private static WidgetConfigResponse toResponse(WidgetConfig widget) {

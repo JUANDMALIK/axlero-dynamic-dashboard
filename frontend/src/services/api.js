@@ -1,123 +1,219 @@
-﻿
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
-const TOKEN_KEY = "axlero_jwt_token";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const TOKEN_KEY = "axlero.auth.token";
+const USERNAME_KEY = "axlero.auth.username";
 
-function getToken() {
-  return sessionStorage.getItem(TOKEN_KEY);
-}
-
-function saveToken(token) {
-  sessionStorage.setItem(TOKEN_KEY, token);
-}
-
-export function logout() {
-  sessionStorage.removeItem(TOKEN_KEY);
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
 }
 
 async function request(endpoint, options = {}) {
-  const headers = {
-    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-    ...options.headers,
-  };
+  const { skipAuth = false, ...fetchOptions } = options;
+  const headers = new Headers(fetchOptions.headers);
+  headers.set("Accept", "application/json");
 
-  const token = getToken();
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (fetchOptions.body !== undefined && !(fetchOptions.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
   }
 
-  let response;
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!skipAuth && token) headers.set("Authorization", `Bearer ${token}`);
 
+  let response;
   try {
-    response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers,
-    });
-  } catch {
-    throw new Error(
-      "Cannot connect to the backend. Check that Spring Boot is running."
-    );
+    response = await fetch(`${API_BASE_URL}${endpoint}`, { ...fetchOptions, headers });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ApiError("Unable to reach the API. Check that the backend is running.", 0);
+    }
+    throw error;
+  }
+
+  if (response.status === 204) return null;
+
+  const responseText = await response.text();
+  let payload = null;
+  if (responseText) {
+    try {
+      payload = JSON.parse(responseText);
+    } catch {
+      payload = responseText;
+    }
   }
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    const message = typeof payload === "string"
+      ? payload
+      : payload?.detail || payload?.message || `API request failed (${response.status}).`;
+    throw new ApiError(message, response.status);
   }
 
-  if (response.status === 204) {
-    return null;
+  return payload;
+}
+
+async function download(endpoint) {
+  const headers = new Headers({ Accept: "*/*" });
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, { headers });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ApiError("Unable to reach the API. Check that the backend is running.", 0);
+    }
+    throw error;
   }
 
-  const contentType = response.headers.get("content-type") || "";
+  if (!response.ok) {
+    const responseText = await response.text();
+    let payload = null;
+    if (responseText) {
+      try {
+        payload = JSON.parse(responseText);
+      } catch {
+        payload = responseText;
+      }
+    }
+    const message = typeof payload === "string"
+      ? payload
+      : payload?.detail || payload?.message || `API request failed (${response.status}).`;
+    throw new ApiError(message, response.status);
+  }
 
-  return contentType.includes("application/json")
-    ? response.json()
-    : response.text();
+  return response.blob();
+}
+
+function authRequest(endpoint, body) {
+  return request(endpoint, {
+    method: "POST",
+    body: JSON.stringify(body),
+    skipAuth: true,
+  });
 }
 
 export const api = {
-  async login(email, password) {
-    const data = await request("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ username: email, password }),
-    });
-
-    if (!data?.token) {
-      throw new Error("Login response did not contain a token.");
-    }
-
-    saveToken(data.token);
-    return data;
+  getSession() {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return null;
+    return {
+      token,
+      username: localStorage.getItem(USERNAME_KEY) || "Workspace user",
+    };
   },
 
-  async register(registrationData) {
-    const data = await request("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify(registrationData),
-    });
-
-    if (data?.token) {
-      saveToken(data.token);
+  saveSession(authResponse) {
+    if (!authResponse?.token || !authResponse?.username) {
+      throw new ApiError("The authentication response did not include a token and username.");
     }
-
-    return data;
+    localStorage.setItem(TOKEN_KEY, authResponse.token);
+    localStorage.setItem(USERNAME_KEY, authResponse.username);
   },
 
-  async uploadDataset(file) {
-    const formData = new FormData();
-    formData.append("file", file);
+  clearSession() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USERNAME_KEY);
+  },
 
+  login(credentials) {
+    return authRequest("/api/auth/login", credentials);
+  },
+
+  register(details) {
+    return authRequest("/api/auth/register", details);
+  },
+
+  getDashboard() {
+    return request("/api/dashboard");
+  },
+
+  getDashboardSummary() {
+    return request("/dashboard");
+  },
+
+  async getWidgets() {
+    const widgets = await request("/api/dashboard/widgets");
+    if (!Array.isArray(widgets)) {
+      throw new ApiError("The widget API returned an unexpected response.");
+    }
+    return widgets.filter((widget) => widget.metricType !== "VALUE");
+  },
+
+  getDataset() {
+    return request("/api/dashboard/dataset").catch((error) => {
+      if (error.status === 404) return null;
+      throw error;
+    });
+  },
+
+  uploadDataset(file) {
+    const body = new FormData();
+    body.append("file", file);
+    return request("/api/dashboard/dataset", {
+      method: "POST",
+      body,
+    });
+  },
+
+  uploadAnalyticsDataset(file) {
+    const body = new FormData();
+    body.append("file", file);
     return request("/api/datasets/upload", {
       method: "POST",
-      body: formData,
+      body,
     });
   },
 
-  async getDatasetAnalytics() {
-    return request("/api/datasets/latest/analytics");
-  },
-
-  async getLatestDataset() {
+  getLatestAnalyticsDataset() {
     return request("/api/datasets/latest");
   },
 
-  logout,
-  get: (endpoint) => request(endpoint),
+  getDatasetAnalytics() {
+    return request("/api/datasets/latest/analytics");
+  },
 
-  post: (endpoint, body) =>
-    request(endpoint, {
+  deleteDataset() {
+    return request("/api/dashboard/dataset", {
+      method: "DELETE",
+    });
+  },
+
+  getWidgetData(widgetId) {
+    return request(`/api/dashboard/widgets/${encodeURIComponent(widgetId)}/data`);
+  },
+
+  createWidget(widget) {
+    return request("/api/dashboard/widgets", {
       method: "POST",
-      body: JSON.stringify(body),
-    }),
+      body: JSON.stringify(widget),
+    });
+  },
 
-  put: (endpoint, body) =>
-    request(endpoint, {
+  deleteWidget(widgetId) {
+    return request(`/api/dashboard/widgets/${encodeURIComponent(widgetId)}`, {
+      method: "DELETE",
+    });
+  },
+
+  reorderWidgets(widgetIds) {
+    return request("/api/dashboard/widgets/order", {
       method: "PUT",
-      body: JSON.stringify(body),
-    }),
+      body: JSON.stringify({ widgetIds }),
+    });
+  },
 
-  delete: (endpoint) =>
-    request(endpoint, { method: "DELETE" }),
+  exportWidgets(format) {
+    if (format === "csv") {
+      return download("/api/dashboard/export.csv");
+    }
+    if (format === "xlsx") {
+      return download("/api/dashboard/export.xlsx");
+    }
+    throw new ApiError("Unsupported export format.");
+  },
 };
-

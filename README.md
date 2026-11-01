@@ -1,256 +1,106 @@
-# Axlero Dynamic Data Dashboard Builder
+# Axlero Dynamic Dashboard
 
-A Spring Boot-based backend application for building and managing dynamic data dashboards. The application provides REST APIs for user authentication, workspace management, dashboard management, and widget configuration.
+Axlero is a Spring Boot 3.5 / Java 21 API and React 19/Vite dashboard for
+authenticated workspaces, data uploads, dashboard widgets, and chart exports.
+PostgreSQL is the application database.
 
-## 🚀 Project Overview
+## Requirements
 
-The **Axlero Dynamic Data Dashboard Builder** aims to provide a centralized platform where users can organize workspaces, create dashboards, and configure visualization widgets.
-
-The current backend includes JWT-based authentication and REST APIs for managing workspaces, dashboards, and dashboard widgets.
-
-## ✨ Features
-
-- **User Authentication:** User registration and login.
-- **JWT Security:** Token-based authentication for protected API endpoints.
-- **Workspace Management:** Create and retrieve workspaces.
-- **Dashboard Management:** Create, retrieve, update, and delete dashboards through the available API endpoints.
-- **Widget Management:** Create, retrieve, update, and delete dashboard widgets.
-- **RESTful APIs:** HTTP endpoints for interacting with backend resources.
-- **PostgreSQL Integration:** Persistent relational data storage.
-- **Validation:** Request validation for required fields and supported field lengths.
-
-## 🛠️ Technology Stack
-
-| Technology | Purpose |
-|---|---|
-| Java 21 | Programming language |
-| Spring Boot 3.5.6 | Backend framework |
-| Spring Security | Application security |
-| JWT | Token-based authentication |
-| Spring Data JPA / Hibernate | Database persistence |
-| PostgreSQL | Relational database |
-| Maven | Build and dependency management |
-| Git and GitHub | Version control and collaboration |
-| IntelliJ IDEA | Development environment |
-
-## 📋 Prerequisites
-
-Install the following before running the application:
-
-- Java Development Kit (JDK) 21
+- Java 21+
+- Node.js and npm
 - PostgreSQL
-- Git
-- IntelliJ IDEA or another Java IDE
 
-The project includes a Maven wrapper, so a separate Maven installation may not be necessary.
+## Local setup
 
-## ⚙️ Installation and Setup
+1. Create the `axlero_dashboard` database in PostgreSQL.
+2. Copy `.env.example` to `.env`. Set the datasource URL, username, and
+   password for your local database, and provide a newly generated `JWT_SECRET`
+   containing at least 32 bytes. Keep `.env` private; it is ignored by Git.
+   Never paste credentials or a JWT secret into chat or commit them.
+3. In PowerShell, start the backend:
 
-### 1. Clone the repository
+   ```powershell
+   .\mvnw.cmd spring-boot:run
+   ```
 
-```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-cd axlero-dashboard-git
-```
+4. In another terminal, install frontend dependencies and start Vite:
 
-Replace the placeholder with your actual repository URL.
+   ```powershell
+   cd frontend
+   npm ci
+   npm run dev
+   ```
 
-### 2. Configure PostgreSQL
+The backend defaults to port 8080. The Vite dev server proxies both `/api` and
+`/dashboard` to the backend and defaults to port 8081; either set
+`SERVER_PORT=8081` before starting Spring Boot, or configure
+`VITE_API_PROXY_TARGET=http://localhost:8080` before starting Vite. Keep the
+backend port and proxy target in sync.
 
-Create the application database:
+The backend also reads `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
+`SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET`, and `APP_CORS_ALLOWED_ORIGINS` from
+the process environment. Never use development credentials or a local JWT key
+in production.
 
-```sql
-CREATE DATABASE axlero_dashboard;
-```
+## Features
 
-Make sure PostgreSQL is running and that your database username and password are correct.
+- JWT registration and login, stateless protected APIs, and configurable CORS.
+- Workspace creation and listing for the authenticated user through API endpoints;
+  workspace management is not currently exposed in the dashboard UI.
+- Dashboard summary and CSV/Excel dashboard configuration exports.
+- Dashboard widget creation, deletion, ordering, chart data, and CSV/XLSX
+  result exports.
+- CSV and `.xlsx` dataset upload for widget charts. Each dashboard stores one
+  active integration dataset (up to 10 MB, 100 columns, and 50,000 data rows);
+  replacing it updates chart results.
+- A compatible CSV analytics API with strict UTF-8/CSV validation and cached
+  summary analytics (up to 100,000 data rows).
+- COUNT, SUM, and AVERAGE chart metrics grouped by an optional dataset column.
 
-### 3. Configure environment variables
+The widget-chart API and legacy CSV analytics API are retained as separate
+compatibility surfaces and use separate persisted dataset records.
+The current dashboard UI uses the widget-chart APIs; the dashboard summary and
+legacy CSV analytics endpoints remain available as backend APIs but are not
+currently displayed in the UI. Workspace creation and listing are also API-only.
+Legacy widget replacement updates only legacy widgets and leaves chart-builder
+widgets unchanged.
 
-The application uses environment variables for sensitive configuration values.
+## API overview
 
-In Windows PowerShell, set:
-
-```powershell
-$env:SPRING_DATASOURCE_PASSWORD = "YOUR_POSTGRES_PASSWORD"
-$env:JWT_SECRET = "YOUR_SECURE_JWT_SECRET"
-```
-
-Use your actual PostgreSQL password. Set a strong, private JWT secret suitable for your environment.
-
-Keep credentials out of source control. Do not commit real passwords, tokens, or production secrets.
-
-### 4. Run the application
-
-From the project root, execute:
-
-```powershell
-.\mvnw.cmd spring-boot:run
-```
-
-The backend runs at:
-
-```text
-http://localhost:8080
-```
-
-To compile the project:
-
-```powershell
-.\mvnw.cmd clean compile
-```
-
-## 🔐 Authentication Workflow
-
-1. Register a user through the registration endpoint.
-2. Log in with the registered credentials.
-3. Receive a JWT token.
-4. Include the token in requests to protected endpoints.
-
-Example authorization header:
-
-```http
-Authorization: Bearer <YOUR_JWT_TOKEN>
-```
-
-## 📡 API Endpoints
-
-All endpoints use the base URL `http://localhost:8080`.
-
-### Authentication
+Protected endpoints require `Authorization: Bearer <token>`.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
 | POST | `/api/auth/register` | Register a user |
-| POST | `/api/auth/login` | Authenticate a user and obtain a JWT |
+| POST | `/api/auth/login` | Authenticate and obtain a JWT |
+| GET, POST | `/api/workspaces` | List or create the current user's workspaces |
+| GET | `/dashboard` | Get the current user's dashboard summary |
+| GET | `/dashboard/export/csv` | Export dashboard widget configuration as CSV |
+| GET | `/dashboard/export/excel` | Export dashboard widget configuration as XLSX |
+| GET | `/api/dashboard` | Get or create the current user's dashboard |
+| GET, PUT | `/api/dashboard/widgets` | List chart-builder widgets or replace legacy widgets without modifying chart-builder widgets |
+| POST | `/api/dashboard/widgets` | Create a chart widget |
+| PUT | `/api/dashboard/widgets/order` | Update widget order |
+| DELETE | `/api/dashboard/widgets/{widgetId}` | Delete a chart widget |
+| GET | `/api/dashboard/widgets/{widgetId}/data` | Get aggregated chart data |
+| GET, POST, DELETE | `/api/dashboard/dataset` | Retrieve, upload, or remove a CSV/XLSX chart dataset |
+| GET | `/api/dashboard/export.csv` | Export calculated chart results as CSV |
+| GET | `/api/dashboard/export.xlsx` | Export calculated chart results as XLSX |
+| POST | `/api/datasets/upload` | Upload a UTF-8 CSV for legacy analytics |
+| GET | `/api/datasets/latest` | Get metadata for the latest legacy CSV |
+| GET | `/api/datasets/latest/analytics` | Get cached statistics and chart-ready CSV analytics |
 
-### Workspaces
+## Validation
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/workspaces` | Create a workspace |
-| GET | `/api/workspaces` | Retrieve workspaces available to the authenticated user |
+Run from the repository root:
 
-### Dashboards
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/workspaces/{workspaceId}/dashboards` | Create a dashboard in a workspace |
-| GET | `/api/workspaces/{workspaceId}/dashboards` | List dashboards in a workspace |
-| GET | `/api/dashboards/{dashboardId}` | Retrieve a dashboard |
-| PUT | `/api/dashboards/{dashboardId}` | Update a dashboard |
-| DELETE | `/api/dashboards/{dashboardId}` | Delete a dashboard |
-
-### Dashboard Widgets
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/dashboards/{dashboardId}/widgets` | Create a widget |
-| GET | `/api/dashboards/{dashboardId}/widgets` | List widgets in a dashboard |
-| PUT | `/api/widgets/{widgetId}` | Update a widget |
-| DELETE | `/api/widgets/{widgetId}` | Delete a widget |
-
-Protected endpoints require a valid JWT in the authorization header.
-
-## 🧩 Widget Configuration
-
-A widget creation or update request accepts the following JSON fields:
-
-```json
-{
-  "title": "Monthly Sales",
-  "chartType": "BAR",
-  "metricType": "SUM",
-  "groupByField": "month",
-  "valueField": "sales",
-  "position": 0
-}
+```powershell
+.\mvnw.cmd test
 ```
 
-| Field | Description |
-|---|---|
-| `title` | Widget title |
-| `chartType` | Chart type configuration |
-| `metricType` | Metric or aggregation configuration |
-| `groupByField` | Field used for grouping |
-| `valueField` | Field used for values |
-| `position` | Widget position, starting from zero |
+Run from `frontend\`:
 
-These fields configure the widget. Actual chart rendering and data aggregation depend on the corresponding functionality being implemented.
-
-## 🧪 Testing the APIs
-
-You can test the backend using PowerShell, Postman, or another HTTP client.
-
-Recommended testing sequence:
-
-1. Register a user.
-2. Log in and obtain a JWT token.
-3. Create a workspace.
-4. Create a dashboard in that workspace.
-5. Create a widget in the dashboard.
-6. Retrieve the widget list.
-7. Update the widget configuration.
-8. Delete the widget and verify that it is no longer listed.
-
-The authentication, workspace, dashboard creation/listing, and widget CRUD flows have been tested during development.
-
-## 📁 Project Structure
-
-The backend follows a layered Spring Boot architecture.
-
-```text
-src/
-└── main/
-    ├── java/
-    │   └── com/axlero/dashboard/
-    │       ├── controller/
-    │       ├── dto/
-    │       ├── service/
-    │       ├── security/
-    │       └── ...
-    └── resources/
-        └── application.properties
+```powershell
+npm run lint
+npm run build
 ```
-
-- **controller:** REST API endpoints.
-- **dto:** Request and response data transfer objects.
-- **service:** Application business logic.
-- **security:** Authentication and authorization components.
-- **resources:** Application configuration.
-
-The exact package contents may evolve as the project develops.
-
-## 🔒 Security Notes
-
-- Store database passwords and JWT secrets in environment variables.
-- Never commit real credentials or JWT tokens.
-- Use HTTPS and appropriate secret management in production.
-- Validate authentication and authorization for every protected resource.
-- Use a strong JWT secret and configure token expiration appropriately.
-
-## 🛣️ Future Enhancements
-
-Potential future improvements include:
-
-- Dynamic chart rendering using real data.
-- CSV and other data-source integrations.
-- Dashboard visualization and filtering.
-- Frontend integration.
-- Improved error handling and API documentation.
-- Automated unit and integration tests.
-- Deployment and production configuration.
-
-These are planned enhancements and are not represented as completed features.
-
-## 👨‍💻 Development
-
-This project is being developed as part of the Axlero internship project.
-
-**Project:** Axlero Dynamic Data Dashboard Builder  
-**Backend:** Java and Spring Boot  
-**Database:** PostgreSQL
-
-## 📄 License
-
-A license has not yet been specified. Add a license before distributing the project if required.

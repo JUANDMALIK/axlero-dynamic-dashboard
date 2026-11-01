@@ -1,9 +1,14 @@
-﻿:root {
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #20253a;
+  background: #f5f6fb;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
 }
 
 *, *::before, *::after {
@@ -25,10 +30,12 @@ body {
 #root {
   width: 100%;
   min-height: 100vh;
-  margin: 0;
 }
 
-button, input, textarea, select {
+button,
+input,
+textarea,
+select {
   font: inherit;
 }
 
@@ -40,14 +47,17 @@ button:disabled {
   cursor: not-allowed;
 }
 
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgb(102 88 232 / 30%);
+  outline-offset: 2px;
+}
+
 ::selection {
   color: #fff;
   background: #6254ed;
-}
-
-:focus-visible {
-  outline: 3px solid #a69cff;
-  outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {

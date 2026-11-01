@@ -6,6 +6,7 @@ import com.axlero.dashboard.dto.RegisterRequest;
 import com.axlero.dashboard.entity.User;
 import com.axlero.dashboard.repository.UserRepository;
 import com.axlero.dashboard.security.JwtService;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,20 +31,24 @@ public class AuthService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "dashboardSummary", allEntries = true)
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByUsername(request.username())) {
+        String username = request.username().trim();
+        String email = request.email().trim();
+
+        if (userRepository.existsByUsername(username)) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT, "Username already exists");
         }
 
-        if (userRepository.existsByEmail(request.email())) {
+        if (userRepository.existsByEmail(email)) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT, "Email already exists");
         }
 
         User user = new User();
-        user.setUsername(request.username());
-        user.setEmail(request.email());
+        user.setUsername(username);
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setRole("USER");
 
@@ -56,8 +61,10 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByUsername(request.username())
-                .or(() -> userRepository.findByEmail(request.username()))
+        String username = request.username().trim();
+
+        User user = userRepository.findByUsername(username)
+                .or(() -> userRepository.findByEmail(username))
                 .orElseThrow(() -> new BadCredentialsException(
                         "Invalid username/email or password"));
 

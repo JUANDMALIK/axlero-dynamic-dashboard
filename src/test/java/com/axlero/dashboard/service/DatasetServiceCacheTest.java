@@ -3,7 +3,9 @@ package com.axlero.dashboard.service;
 import com.axlero.dashboard.config.CacheConfig;
 import com.axlero.dashboard.entity.Dashboard;
 import com.axlero.dashboard.entity.Dataset;
+import com.axlero.dashboard.repository.DashboardDatasetRepository;
 import com.axlero.dashboard.repository.DatasetRepository;
+import com.axlero.dashboard.repository.WidgetConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +37,10 @@ class DatasetServiceCacheTest {
     void setUp() {
         datasetRepository = mock(DatasetRepository.class);
         dashboardService = mock(DashboardService.class);
+        DashboardDatasetRepository dashboardDatasetRepository =
+                mock(DashboardDatasetRepository.class);
+        WidgetConfigRepository widgetConfigRepository =
+                mock(WidgetConfigRepository.class);
 
         context = new AnnotationConfigApplicationContext();
 
@@ -48,6 +54,18 @@ class DatasetServiceCacheTest {
                 "dashboardService",
                 DashboardService.class,
                 () -> dashboardService
+        );
+
+        context.registerBean(
+                "dashboardDatasetRepository",
+                DashboardDatasetRepository.class,
+                () -> dashboardDatasetRepository
+        );
+
+        context.registerBean(
+                "widgetConfigRepository",
+                WidgetConfigRepository.class,
+                () -> widgetConfigRepository
         );
 
         context.registerBean(
@@ -133,12 +151,16 @@ class DatasetServiceCacheTest {
         DatasetService datasetService(
                 DatasetRepository repository,
                 DashboardService dashboardService,
-                ObjectMapper mapper) {
+                ObjectMapper mapper,
+                DashboardDatasetRepository dashboardDatasetRepository,
+                WidgetConfigRepository widgetConfigRepository) {
 
             return new DatasetService(
-                    repository,
                     dashboardService,
-                    mapper
+                    dashboardDatasetRepository,
+                    widgetConfigRepository,
+                    mapper,
+                    repository
             );
         }
     }
