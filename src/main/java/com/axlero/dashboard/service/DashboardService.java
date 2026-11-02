@@ -11,6 +11,8 @@ import com.axlero.dashboard.entity.WidgetConfig;
 import com.axlero.dashboard.repository.DashboardRepository;
 import com.axlero.dashboard.repository.UserRepository;
 import com.axlero.dashboard.repository.WidgetConfigRepository;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class DashboardService {
         this.userRepository = userRepository;
     }
 
+    @Cacheable(cacheNames = "dashboardSummary", key = "#p0")
     @Transactional(readOnly = true)
     public List<DashboardResponse> list(String email) {
         Long userId = userId(email);
@@ -43,11 +46,13 @@ public class DashboardService {
                 .toList();
     }
 
+    @Cacheable(cacheNames = "dashboardSummary", key = "#p0 + ':' + #p1")
     @Transactional(readOnly = true)
     public DashboardResponse get(Long dashboardId, String email) {
         return response(findOwnedDashboard(dashboardId, email));
     }
 
+    @CacheEvict(cacheNames = "dashboardSummary", allEntries = true)
     @Transactional
     public DashboardResponse create(DashboardRequest request, String email) {
         Dashboard dashboard = new Dashboard();
@@ -57,6 +62,7 @@ public class DashboardService {
         return saveWidgets(saved, request.widgets());
     }
 
+    @CacheEvict(cacheNames = "dashboardSummary", allEntries = true)
     @Transactional
     public DashboardResponse update(Long dashboardId, DashboardRequest request, String email) {
         Dashboard dashboard = findOwnedDashboard(dashboardId, email);
@@ -66,6 +72,7 @@ public class DashboardService {
         return saveWidgets(saved, request.widgets());
     }
 
+    @CacheEvict(cacheNames = "dashboardSummary", allEntries = true)
     @Transactional
     public void delete(Long dashboardId, String email) {
         Dashboard dashboard = findOwnedDashboard(dashboardId, email);
