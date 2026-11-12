@@ -1,638 +1,482 @@
-# 
+﻿# Axlero Dynamic Dashboard
 
-# \# Axlero Dynamic Dashboard
+Axlero Dynamic Dashboard is a full-stack web application built using React and Spring Boot. It provides user authentication, dashboard management, widgets, dataset uploads, chart visualizations, analytics, and data exports.
 
-# 
+The application uses PostgreSQL for persistent storage and JWT-based authentication for secure API access.
 
-# Axlero Dynamic Dashboard is a full-stack web application built using React and Spring Boot. It provides user authentication, dashboard management, widgets, dataset uploads, chart visualizations, analytics, and data exports.
+## Features
 
-# 
+- User registration and login.
 
-# The application uses PostgreSQL for persistent storage and JWT-based authentication for secure API access.
+- JWT-based authentication.
 
-# 
+- BCrypt password encryption.
 
-# \## Features
+- Stateless REST APIs.
 
-# 
+- Workspace creation and listing.
 
-# \- User registration and login.
+- Dashboard summary and management.
 
-# \- JWT-based authentication.
+- Create, retrieve, delete, and reorder dashboard widgets.
 
-# \- BCrypt password encryption.
+- CSV and XLSX dataset uploads.
 
-# \- Stateless REST APIs.
+- Widget-based chart data and visualizations.
 
-# \- Workspace creation and listing.
+- Dataset analytics.
 
-# \- Dashboard summary and management.
+- CSV and Excel exports.
 
-# \- Create, retrieve, delete, and reorder dashboard widgets.
+## Technology Stack
 
-# \- CSV and XLSX dataset uploads.
+### Frontend
 
-# \- Widget-based chart data and visualizations.
+| Technology | Version |
 
-# \- Dataset analytics.
+|---|---|
 
-# \- CSV and Excel exports.
+| React | 19.3.1 |
 
-# 
+| React DOM | 19.3.1 |
 
-# \## Technology Stack
+| Vite | 8.3.4 |
 
-# 
+| Recharts | 3.10.1 |
 
-# \### Frontend
+| Lucide React | 1.59.0 |
 
-# 
+| JavaScript | ES Modules |
 
-# | Technology | Version |
+### Backend
 
-# |---|---|
+| Technology | Version / Configuration |
 
-# | React | 19.3.1 |
+|---|---|
 
-# | React DOM | 19.3.1 |
+| Java | 21 |
 
-# | Vite | 8.3.4 |
+| Spring Boot | 3.5.6 |
 
-# | Recharts | 3.10.1 |
+| Spring Security | Spring Boot managed |
 
-# | Lucide React | 1.59.0 |
+| Spring Data JPA | Spring Boot managed |
 
-# | JavaScript | ES Modules |
+| Database | PostgreSQL |
 
-# 
+| Authentication | JWT |
 
-# \### Backend
+| Password Encoding | BCrypt |
 
-# 
+## System Architecture
 
-# | Technology | Version / Configuration |
+The application follows a frontend and backend architecture.
 
-# |---|---|
+1\. React provides the user interface.
 
-# | Java | 21 |
+2\. Vite runs the frontend during development.
 
-# | Spring Boot | 3.5.6 |
+3\. Spring Boot handles REST API requests.
 
-# | Spring Security | Spring Boot managed |
+4\. Spring Security and JWT handle authentication.
 
-# | Spring Data JPA | Spring Boot managed |
+5\. PostgreSQL stores application data.
 
-# | Database | PostgreSQL |
+```text
 
-# | Authentication | JWT |
+React Frontend
 
-# | Password Encoding | BCrypt |
+&#x20;     |
 
-# 
+&#x20;     v
 
-# \## System Architecture
+&#x20;  Vite Server
 
-# 
+&#x20;     |
 
-# The application follows a frontend and backend architecture.
+&#x20;     v
 
-# 
+Spring Boot Backend
 
-# 1\. React provides the user interface.
+&#x20;     |
 
-# 2\. Vite runs the frontend during development.
+&#x20;     +---- Authentication
 
-# 3\. Spring Boot handles REST API requests.
+&#x20;     |
 
-# 4\. Spring Security and JWT handle authentication.
+&#x20;     +---- Dashboard
 
-# 5\. PostgreSQL stores application data.
+&#x20;     |
 
-# 
+&#x20;     +---- Widget Management
 
-# ```text
+&#x20;     |
 
-# React Frontend
+&#x20;     +---- Dataset Management
 
-# &#x20;     |
+&#x20;     |
 
-# &#x20;     v
+&#x20;     +---- Analytics and Exports
 
-# &#x20;  Vite Server
+&#x20;     |
 
-# &#x20;     |
+&#x20;     v
 
-# &#x20;     v
+&#x20;  PostgreSQL
 
-# Spring Boot Backend
+```
 
-# &#x20;     |
+## Requirements
 
-# &#x20;     +---- Authentication
+Install the following software:
 
-# &#x20;     |
+- JDK 21 or later
 
-# &#x20;     +---- Dashboard
+- Node.js and npm
 
-# &#x20;     |
+- PostgreSQL
 
-# &#x20;     +---- Widget Management
+- Git
 
-# &#x20;     |
+Check the installed versions:
 
-# &#x20;     +---- Dataset Management
+```powershell
 
-# &#x20;     |
+java -version
 
-# &#x20;     +---- Analytics and Exports
+node --version
 
-# &#x20;     |
+npm --version
 
-# &#x20;     v
+git --version
 
-# &#x20;  PostgreSQL
+```
 
-# ```
+## Installation and Setup
 
-# 
+### 1. Clone the Repository
 
-# \## Requirements
+```powershell
 
-# 
+git clone https://github.com/JUANDMALIK/axlero-dynamic-dashboard.git
 
-# Install the following software:
+cd axlero-dynamic-dashboard
 
-# 
+```
 
-# \- JDK 21 or later
+### 2. Create PostgreSQL Database
 
-# \- Node.js and npm
+Create a database named:
 
-# \- PostgreSQL
+```sql
 
-# \- Git
+CREATE DATABASE axlero\_dashboard;
 
-# 
+```
 
-# Check the installed versions:
+Make sure PostgreSQL is running.
 
-# 
+### 3. Configure Environment Variables
 
-# ```powershell
+Copy the example environment file:
 
-# java -version
+```powershell
 
-# node --version
+Copy-Item .env.example .env
 
-# npm --version
+```
 
-# git --version
+Open `.env` and configure your PostgreSQL credentials:
 
-# ```
+```properties
 
-# 
+SPRING\_DATASOURCE\_URL=jdbc:postgresql://localhost:5432/axlero\_dashboard
 
-# \## Installation and Setup
+SPRING\_DATASOURCE\_USERNAME=your\_postgres\_username
 
-# 
+SPRING\_DATASOURCE\_PASSWORD=your\_postgres\_password
 
-# \### 1. Clone the Repository
+JWT\_SECRET=your\_secure\_random\_secret\_at\_least\_32\_bytes
 
-# 
+```
 
-# ```powershell
+Important:
 
-# git clone https://github.com/JUANDMALIK/axlero-dynamic-dashboard.git
+- Replace the username and password with your PostgreSQL credentials.
 
-# cd axlero-dynamic-dashboard
+- Generate a secure random JWT secret of at least 32 bytes.
 
-# ```
+- Never commit your `.env` file or expose secret credentials.
 
-# 
+- The application uses port `8080` for the backend by default.
 
-# \### 2. Create PostgreSQL Database
+### 4. Run the Backend
 
-# 
+From the project root directory:
 
-# Create a database named:
+```powershell
 
-# 
+.\\mvnw.cmd spring-boot:run
 
-# ```sql
+```
 
-# CREATE DATABASE axlero\_dashboard;
+Backend URL:
 
-# ```
+```text
 
-# 
+http://localhost:8080
 
-# Make sure PostgreSQL is running.
+```
 
-# 
+### 5. Run the Frontend
 
-# \### 3. Configure Environment Variables
+Open another terminal:
 
-# 
+```powershell
 
-# Copy the example environment file:
+cd frontend
 
-# 
+npm install
 
-# ```powershell
+npm run dev
 
-# Copy-Item .env.example .env
+```
 
-# ```
+Open the local URL displayed by Vite. The default development URL is:
 
-# 
+```text
 
-# Open `.env` and configure your PostgreSQL credentials:
+http://localhost:5173
 
-# 
+```
 
-# ```properties
+The Vite development server proxies `/api` and `/dashboard` requests to the backend at `http://127.0.0.1:8080` by default.
 
-# SPRING\_DATASOURCE\_URL=jdbc:postgresql://localhost:5432/axlero\_dashboard
+## Authentication and Security
 
-# SPRING\_DATASOURCE\_USERNAME=your\_postgres\_username
+- Users can register and log in using the authentication API.
 
-# SPRING\_DATASOURCE\_PASSWORD=your\_postgres\_password
+- Passwords are encoded using BCrypt.
 
-# JWT\_SECRET=your\_secure\_random\_secret\_at\_least\_32\_bytes
+- JWT tokens are used for authenticated requests.
 
-# ```
+- The frontend stores the authentication token in browser local storage.
 
-# 
+- Protected requests use the `Authorization: Bearer <token>` header.
 
-# Important:
+- The backend uses stateless session management.
 
-# 
+- CSRF protection is disabled for the stateless bearer-token API.
 
-# \- Replace the username and password with your PostgreSQL credentials.
+- CORS origins can be configured using `APP\_CORS\_ALLOWED\_ORIGINS`.
 
-# \- Generate a secure random JWT secret of at least 32 bytes.
+- JWT expiration is configured for 24 hours.
 
-# \- Never commit your `.env` file or expose secret credentials.
+## API Endpoints
 
-# \- The application uses port `8080` for the backend by default.
+### Authentication APIs
 
-# 
+| Method | Endpoint | Description |
 
-# \### 4. Run the Backend
+|---|---|---|
 
-# 
+| POST | `/api/auth/register` | Register a new user |
 
-# From the project root directory:
+| POST | `/api/auth/login` | User login |
 
-# 
+| GET | `/api/me` | Get authenticated user information |
 
-# ```powershell
+### Workspace APIs
 
-# .\\mvnw.cmd spring-boot:run
+| Method | Endpoint | Description |
 
-# ```
+|---|---|---|
 
-# 
+| POST | `/api/workspaces` | Create a workspace |
 
-# Backend URL:
+| GET | `/api/workspaces` | Get workspaces |
 
-# 
+### Dashboard APIs
 
-# ```text
+| Method | Endpoint | Description |
 
-# http://localhost:8080
+|---|---|---|
 
-# ```
+| GET | `/api/dashboard` | Get dashboard details |
 
-# 
+| GET | `/dashboard` | Get dashboard summary |
 
-# \### 5. Run the Frontend
+| GET | `/api/dashboard/widgets` | Get dashboard widgets |
 
-# 
+| POST | `/api/dashboard/widgets` | Create a widget |
 
-# Open another terminal:
+| PUT | `/api/dashboard/widgets` | Update widget configuration |
 
-# 
+| PUT | `/api/dashboard/widgets/order` | Update widget order |
 
-# ```powershell
+| DELETE | `/api/dashboard/widgets/{widgetId}` | Delete a widget |
 
-# cd frontend
+| GET | `/api/dashboard/widgets/{widgetId}/data` | Get widget chart data |
 
-# npm install
+### Dataset APIs
 
-# npm run dev
+| Method | Endpoint | Description |
 
-# ```
+|---|---|---|
 
-# 
+| GET | `/api/dashboard/dataset` | Get dashboard dataset |
 
-# Open the local URL displayed by Vite. The default development URL is:
+| POST | `/api/dashboard/dataset` | Upload dashboard dataset |
 
-# 
+| DELETE | `/api/dashboard/dataset` | Delete dashboard dataset |
 
-# ```text
+| POST | `/api/datasets/upload` | Upload dataset for legacy analytics |
 
-# http://localhost:5173
+| GET | `/api/datasets/latest` | Get latest dataset |
 
-# ```
+| GET | `/api/datasets/latest/analytics` | Get dataset analytics |
 
-# 
+### Export APIs
 
-# The Vite development server proxies `/api` and `/dashboard` requests to the backend at `http://127.0.0.1:8080` by default.
+| Method | Endpoint | Description |
 
-# 
+|---|---|---|
 
-# \## Authentication and Security
+| GET | `/api/dashboard/export.csv` | Export widget chart results as CSV |
 
-# 
+| GET | `/api/dashboard/export.xlsx` | Export widget chart results as XLSX |
 
-# \- Users can register and log in using the authentication API.
+| GET | `/dashboard/export/csv` | Export dashboard summary as CSV |
 
-# \- Passwords are encoded using BCrypt.
+| GET | `/dashboard/export/excel` | Export dashboard summary as Excel |
 
-# \- JWT tokens are used for authenticated requests.
+\*\*Note:\*\* The dashboard widget API and legacy CSV analytics API are separate compatibility surfaces with separate dataset records. The current dashboard UI uses the widget-chart API. Workspace management and legacy analytics are available through backend APIs.
 
-# \- The frontend stores the authentication token in browser local storage.
+## Testing and Build
 
-# \- Protected requests use the `Authorization: Bearer <token>` header.
+### Backend Tests
 
-# \- The backend uses stateless session management.
+Run from the project root:
 
-# \- CSRF protection is disabled for the stateless bearer-token API.
+```powershell
 
-# \- CORS origins can be configured using `APP\_CORS\_ALLOWED\_ORIGINS`.
+.\\mvnw.cmd test
 
-# \- JWT expiration is configured for 24 hours.
+```
 
-# 
+Build the backend:
 
-# \## API Endpoints
+```powershell
 
-# 
+.\\mvnw.cmd clean package
 
-# \### Authentication APIs
+```
 
-# 
+### Frontend Linting
 
-# | Method | Endpoint | Description |
+Run from the frontend directory:
 
-# |---|---|---|
+```powershell
 
-# | POST | `/api/auth/register` | Register a new user |
+npm run lint
 
-# | POST | `/api/auth/login` | User login |
+```
 
-# | GET | `/api/me` | Get authenticated user information |
+### Frontend Production Build
 
-# 
+```powershell
 
-# \### Workspace APIs
+npm run build
 
-# 
+```
 
-# | Method | Endpoint | Description |
+The production build is generated inside:
 
-# |---|---|---|
+```text
 
-# | POST | `/api/workspaces` | Create a workspace |
+frontend/dist/
 
-# | GET | `/api/workspaces` | Get workspaces |
+```
 
-# 
+## Project Structure
 
-# \### Dashboard APIs
+```text
 
-# 
+axlero-dynamic-dashboard/
 
-# | Method | Endpoint | Description |
+â”‚
 
-# |---|---|---|
+â”œâ”€â”€ frontend/
 
-# | GET | `/api/dashboard` | Get dashboard details |
+â”‚   â”œâ”€â”€ src/
 
-# | GET | `/dashboard` | Get dashboard summary |
+â”‚   â”‚   â”œâ”€â”€ services/
 
-# | GET | `/api/dashboard/widgets` | Get dashboard widgets |
+â”‚   â”‚   â”œâ”€â”€ components/
 
-# | POST | `/api/dashboard/widgets` | Create a widget |
+â”‚   â”‚   â””â”€â”€ ...
 
-# | PUT | `/api/dashboard/widgets` | Update widget configuration |
+â”‚   â”œâ”€â”€ package.json
 
-# | PUT | `/api/dashboard/widgets/order` | Update widget order |
+â”‚   â””â”€â”€ vite.config.js
 
-# | DELETE | `/api/dashboard/widgets/{widgetId}` | Delete a widget |
+â”‚
 
-# | GET | `/api/dashboard/widgets/{widgetId}/data` | Get widget chart data |
+â”œâ”€â”€ src/
 
-# 
+â”‚   â”œâ”€â”€ main/
 
-# \### Dataset APIs
+â”‚   â”‚   â”œâ”€â”€ java/
 
-# 
+â”‚   â”‚   â”‚   â””â”€â”€ com/axlero/dashboard/
 
-# | Method | Endpoint | Description |
+â”‚   â”‚   â”‚       â”œâ”€â”€ controller/
 
-# |---|---|---|
+â”‚   â”‚   â”‚       â”œâ”€â”€ security/
 
-# | GET | `/api/dashboard/dataset` | Get dashboard dataset |
+â”‚   â”‚   â”‚       â”œâ”€â”€ service/
 
-# | POST | `/api/dashboard/dataset` | Upload dashboard dataset |
+â”‚   â”‚   â”‚       â””â”€â”€ repository/
 
-# | DELETE | `/api/dashboard/dataset` | Delete dashboard dataset |
+â”‚   â”‚   â”‚
 
-# | POST | `/api/datasets/upload` | Upload dataset for legacy analytics |
+â”‚   â”‚   â””â”€â”€ resources/
 
-# | GET | `/api/datasets/latest` | Get latest dataset |
+â”‚   â”‚       â””â”€â”€ application.properties
 
-# | GET | `/api/datasets/latest/analytics` | Get dataset analytics |
+â”‚   â”‚
 
-# 
+â”‚   â””â”€â”€ test/
 
-# \### Export APIs
+â”‚
 
-# 
+â”œâ”€â”€ .env.example
 
-# | Method | Endpoint | Description |
+â”œâ”€â”€ mvnw
 
-# |---|---|---|
+â”œâ”€â”€ mvnw.cmd
 
-# | GET | `/api/dashboard/export.csv` | Export widget chart results as CSV |
+â”œâ”€â”€ pom.xml
 
-# | GET | `/api/dashboard/export.xlsx` | Export widget chart results as XLSX |
+â””â”€â”€ README.md
 
-# | GET | `/dashboard/export/csv` | Export dashboard summary as CSV |
+```
 
-# | GET | `/dashboard/export/excel` | Export dashboard summary as Excel |
+## Production Considerations
 
-# 
+- Use a secure PostgreSQL database.
 
-# \*\*Note:\*\* The dashboard widget API and legacy CSV analytics API are separate compatibility surfaces with separate dataset records. The current dashboard UI uses the widget-chart API. Workspace management and legacy analytics are available through backend APIs.
+- Configure strong JWT secrets.
 
-# 
+- Use HTTPS for deployed applications.
 
-# \## Testing and Build
+- Configure allowed CORS origins.
 
-# 
+- Keep credentials outside source control.
 
-# \### Backend Tests
+- Maintain regular database backups.
 
-# 
+## License
 
-# Run from the project root:
-
-# 
-
-# ```powershell
-
-# .\\mvnw.cmd test
-
-# ```
-
-# 
-
-# Build the backend:
-
-# 
-
-# ```powershell
-
-# .\\mvnw.cmd clean package
-
-# ```
-
-# 
-
-# \### Frontend Linting
-
-# 
-
-# Run from the frontend directory:
-
-# 
-
-# ```powershell
-
-# npm run lint
-
-# ```
-
-# 
-
-# \### Frontend Production Build
-
-# 
-
-# ```powershell
-
-# npm run build
-
-# ```
-
-# 
-
-# The production build is generated inside:
-
-# 
-
-# ```text
-
-# frontend/dist/
-
-# ```
-
-# 
-
-# \## Project Structure
-
-# 
-
-# ```text
-
-# axlero-dynamic-dashboard/
-
-# │
-
-# ├── frontend/
-
-# │   ├── src/
-
-# │   │   ├── services/
-
-# │   │   ├── components/
-
-# │   │   └── ...
-
-# │   ├── package.json
-
-# │   └── vite.config.js
-
-# │
-
-# ├── src/
-
-# │   ├── main/
-
-# │   │   ├── java/
-
-# │   │   │   └── com/axlero/dashboard/
-
-# │   │   │       ├── controller/
-
-# │   │   │       ├── security/
-
-# │   │   │       ├── service/
-
-# │   │   │       └── repository/
-
-# │   │   │
-
-# │   │   └── resources/
-
-# │   │       └── application.properties
-
-# │   │
-
-# │   └── test/
-
-# │
-
-# ├── .env.example
-
-# ├── mvnw
-
-# ├── mvnw.cmd
-
-# ├── pom.xml
-
-# └── README.md
-
-# ```
-
-# 
-
-# \## Production Considerations
-
-# 
-
-# \- Use a secure PostgreSQL database.
-
-# \- Configure strong JWT secrets.
-
-# \- Use HTTPS for deployed applications.
-
-# \- Configure allowed CORS origins.
-
-# \- Keep credentials outside source control.
-
-# \- Maintain regular database backups.
-
-# 
-
-# \## License
-
-# 
-
-# No license has been specified for this repository.
-
-
+No license has been specified for this repository.
 
